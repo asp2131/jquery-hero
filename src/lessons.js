@@ -45,7 +45,7 @@ export const lessons = [
     explanation:
       'A library is a collection of reusable code. jQuery is a JavaScript library for working with HTML, styles, and events. A normal website must import it before using it; this workshop already loads real jQuery for you. $ is the jQuery function. $("#beacon") selects the element with id="beacon", and .text("Awake") replaces its text. Put your JavaScript here, without script tags.',
     starter:
-      '// Select the beacon and give it a new message.\n$("#beacon").text( );',
+      '// The beacon says "Sleeping" right now (peek at the index.html tab).\n// Select it and give it a new message.\n$("#beacon").text( );',
     html: '<section><h2 id="beacon">Sleeping</h2><p id="sign">Camp</p></section>',
     hints: [
       "An ID selector starts with #. Use #beacon, not beacon.",
