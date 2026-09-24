@@ -87,15 +87,15 @@ let toastTimer;
 let audio;
 
 function save() {
+  const wasAvailable = storageAvailable;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     storageAvailable = true;
   } catch {
     storageAvailable = false;
   }
-  $("save-status").textContent = storageAvailable
-    ? "Changes saved locally"
-    : "Session only · storage unavailable";
+  if (wasAvailable && !storageAvailable)
+    toast("Progress can't be saved in this browser. It lasts this session only.");
 }
 function toast(message) {
   clearTimeout(toastTimer);
@@ -179,8 +179,6 @@ const editorExtensions = [
     if (currentResult) {
       currentResult = null;
       renderTests();
-      $("run-caption").textContent =
-        "Code changed. Run again to check this version.";
     }
   }),
   EditorView.theme(
@@ -219,41 +217,11 @@ function isUnlocked(index) {
   );
 }
 function renderProgress() {
-  const total = state.completed.reduce(
-    (sum, id) => sum + lessons[id].reward,
-    0,
-  );
-  $("xp-value").textContent = total.toLocaleString();
-  $("crystal-value").innerHTML =
-    `${state.collected.length}<span>/${lessons.length}</span>`;
+  $("crystal-value").textContent = state.collected.length;
   $("progress-value").textContent =
-    `${state.completed.length} of ${lessons.length}`;
+    `${state.completed.length} / ${lessons.length}`;
   $("progress-fill").style.width =
     `${(state.completed.length / lessons.length) * 100}%`;
-  $("player-rank").textContent =
-    `LEVEL ${String(Math.floor(state.completed.length / 3) + 1).padStart(2, "0")} · ${state.completed.length === 12 ? "ISLAND KEEPER" : "EXPLORER"}`;
-  $("world-status").textContent =
-    state.completed.length === 12
-      ? "Island restored · keep exploring"
-      : `${lessons.length - state.completed.length} discoveries ahead`;
-  $("quest-path").replaceChildren(
-    ...lessons.map((lesson) => {
-      const btn = document.createElement("button");
-      btn.className = `quest-node${state.active === lesson.id ? " current" : ""}${state.completed.includes(lesson.id) ? " complete" : ""}`;
-      btn.textContent = state.completed.includes(lesson.id)
-        ? "✓"
-        : number(lesson.id);
-      btn.disabled = !isUnlocked(lesson.id) || running;
-      btn.title = `${number(lesson.id)} · ${lesson.title}${!isUnlocked(lesson.id) ? " · locked" : ""}`;
-      btn.setAttribute(
-        "aria-label",
-        `${lesson.title}, ${state.completed.includes(lesson.id) ? "completed" : !isUnlocked(lesson.id) ? "locked" : "available"}`,
-      );
-      if (state.active === lesson.id) btn.setAttribute("aria-current", "step");
-      btn.onclick = () => selectLesson(lesson.id);
-      return btn;
-    }),
-  );
   world.setProgress({
     completed: state.completed,
     active: state.active,
@@ -282,15 +250,8 @@ function renderTests() {
       return row;
     }),
   );
-  const passed = currentResult?.tests.filter((test) => test.passed).length || 0;
-  $("test-count").textContent = currentResult
-    ? `${passed}/${tests.length}`
-    : `${tests.length} TESTS`;
-  $("test-state").textContent = currentResult
-    ? passed === tests.length && !currentResult.error
-      ? "ALL CLEAR"
-      : "KEEP EXPLORING"
-    : "READY WHEN YOU ARE";
+  // The objectives already describe the goal; checkpoints only matter after a run.
+  $("test-section").hidden = !currentResult;
   $("run-error").hidden = !currentResult?.error;
   $("run-error").textContent = currentResult?.error || "";
   $("continue-button").hidden = !state.completed.includes(state.active);
@@ -342,13 +303,12 @@ function selectLesson(index, { fromWorld = false } = {}) {
     }),
   );
   loadingLesson = false;
-  $("mission-number").textContent = `QUEST ${number(index)}`;
-  $("mission-concept").textContent = lesson.concept.toUpperCase();
+  $("mission-number").textContent = `Quest ${index + 1}`;
+  $("mission-concept").textContent = lesson.concept;
   $("mission-title").textContent = lesson.title;
   $("mission-description").textContent = lesson.description;
   $("guide-note").textContent = lesson.explanation;
   $("source-label").textContent = lesson.source;
-  $("region-title").textContent = lesson.chapter;
   $("objectives").replaceChildren(
     ...lesson.objectives.map((text) => {
       const li = document.createElement("li");
@@ -358,9 +318,6 @@ function selectLesson(index, { fromWorld = false } = {}) {
   );
   $("html-source").textContent = lesson.html;
   $("hint-panel").hidden = true;
-  $("run-caption").textContent = state.completed.includes(index)
-    ? "Quest complete. Revisit your code or explore for crystals."
-    : "Your code. Real tests. A little island magic.";
   selectTab("js");
   setPreview(lesson.html);
   renderTests();
@@ -375,12 +332,9 @@ function setExploring(value) {
   exploring = value;
   world.setExploring(value);
   $("explore-button").setAttribute("aria-pressed", String(value));
-  $("explore-button").innerHTML = value
-    ? "Back to coding <span>↙</span>"
-    : "Explore island <span>↗</span>";
+  $("explore-button").textContent = value ? "Back to coding" : "Explore island";
   $("movement-controls").hidden = !value;
-  $("world-tip").innerHTML =
-    `<span class="status-dot"></span> ${value ? "Click a tile or use WASD / arrows. Follow the gold crystals." : state.completed.length ? "A little brighter. Your next discovery is just a script away." : "A quiet island. A little jQuery can change that."}`;
+  $("world-tip").hidden = !value;
   if (value) {
     world.focus();
     $("world").scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -395,7 +349,6 @@ async function execute() {
   $("run-button").disabled = true;
   $("reset-code").disabled = true;
   $("run-label").textContent = "Checking your spell…";
-  $("test-state").textContent = "RUNNING REAL JQUERY";
   $("continue-button").hidden = true;
   renderProgress();
   try {
@@ -429,8 +382,6 @@ async function execute() {
       }
       $("run-caption").textContent =
         "Beautifully done. Your code brought the island to life.";
-      $("world-tip").innerHTML =
-        '<span class="status-dot"></span> Quest restored! Explore to collect your golden crystal.';
       if (state.completed.length === lessons.length && firstPass)
         showCompletion();
     } else {
@@ -448,6 +399,7 @@ async function execute() {
       error: error.message || String(error),
       html: lesson.html,
     };
+    $("run-caption").textContent = "Your code hit an error.";
     renderTests();
   } finally {
     running = false;
@@ -574,9 +526,7 @@ $("continue-button").onclick = () => {
       : selectLesson(state.active + 1);
 };
 $("map-button").onclick = showMap;
-$("journey-button").onclick = showMap;
 $("guide-button").onclick = showGuide;
-$("syntax-button").onclick = showGuide;
 $("hint-button").onclick = () => {
   if (!$("hint-panel").hidden) $("hint-panel").hidden = true;
   else showHints();

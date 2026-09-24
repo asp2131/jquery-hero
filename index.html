@@ -22,19 +22,18 @@
       <header class="site-header">
         <a class="brand" href="./" aria-label="jQuery Quest home"
           ><span class="brand-mark">$<span>_</span></span
-          ><span
-            >jQuery<span class="brand-light">Quest</span
-            ><small>THE CODE IS THE ADVENTURE</small></span
-          ></a
+          ><span>jQuery<span class="brand-light">Quest</span></span></a
         >
-        <nav aria-label="Main navigation">
-          <button class="nav-item active" id="journey-button">
-            Your journey</button
-          ><button class="nav-item" id="guide-button">
-            Field guide <span>↗</span>
-          </button>
-        </nav>
+        <div class="header-progress" title="Quests complete">
+          <div class="progress-track"><span id="progress-fill"></span></div>
+          <strong id="progress-value">0 / 12</strong>
+          <span class="crystal-count" title="Crystals found"
+            ><span class="crystal-icon"></span
+            ><span id="crystal-value">0</span></span
+          >
+        </div>
         <div class="header-actions">
+          <button id="guide-button" class="nav-item">Guide</button>
           <button
             id="sound-button"
             class="icon-button"
@@ -44,263 +43,148 @@
           >
             ♫<span class="sound-off">×</span>
           </button>
-          <div class="avatar" aria-hidden="true"></div>
-          <div class="player-name">
-            New adventurer<small id="player-rank">LEVEL 01 · EXPLORER</small>
-          </div>
         </div>
       </header>
-      <main>
-        <section class="journey-heading" aria-label="Campaign progress">
-          <div>
-            <div class="eyebrow">
-              <span class="tiny-diamond"></span> THE DOM ISLANDS
-              <span class="muted">/</span> A JQUERY ADVENTURE
+      <main class="workspace">
+        <section class="adventure-column" aria-label="Island adventure">
+          <div class="world-card">
+            <div class="world-actions">
+              <button id="map-button" title="Open quest map">Quests</button
+              ><button id="explore-button" aria-pressed="false">
+                Explore island
+              </button>
             </div>
-            <h1>Small scripts. <span>Big adventures.</span></h1>
-            <p>Bring a forgotten island to life, one line of code at a time.</p>
-          </div>
-          <div class="journey-stats">
-            <div>
-              <span class="stat-icon">✧</span><strong id="xp-value">0</strong
-              ><small>XP EARNED</small>
+            <canvas
+              id="world"
+              tabindex="0"
+              role="img"
+              aria-label="Interactive isometric island. Enable Explore, then use arrow keys or WASD to move, or click a tile."
+            ></canvas>
+            <div class="world-tip" id="world-tip" hidden>
+              Click a tile or use WASD / arrows. Follow the gold crystals.
             </div>
-            <div>
-              <span class="crystal-icon"></span
-              ><strong id="crystal-value">0<span>/12</span></strong
-              ><small>CRYSTALS FOUND</small>
-            </div>
-            <div class="progress-stat">
-              <div class="progress-label">
-                <strong id="progress-value">0 of 12</strong
-                ><span>quests complete</span>
+            <div class="movement-controls" id="movement-controls" hidden>
+              <button data-direction="up" aria-label="Move up">↑</button>
+              <div>
+                <button data-direction="left" aria-label="Move left">←</button
+                ><button data-direction="down" aria-label="Move down">
+                  ↓</button
+                ><button data-direction="right" aria-label="Move right">
+                  →
+                </button>
               </div>
-              <div class="progress-track"><span id="progress-fill"></span></div>
-              <small>YOUR ISLAND IS WAITING</small>
+            </div>
+          </div>
+          <article class="mission-card">
+            <h2 id="mission-title">Wake the beacon</h2>
+            <p class="mission-description" id="mission-description"></p>
+            <ul class="objectives" id="objectives"></ul>
+            <details class="guide-note">
+              <summary>
+                <span class="guide-avatar" aria-hidden="true"></span>
+                How does this work?
+              </summary>
+              <p id="guide-note"></p>
+              <small
+                ><span id="mission-number">QUEST 01</span> ·
+                <span id="mission-concept"></span> ·
+                <a id="slides-link" target="_blank" rel="noopener"
+                  ><span id="source-label"></span> ↗</a
+                ></small
+              >
+            </details>
+            <button id="hint-button" class="hint-button">Need a hint?</button>
+            <div id="hint-panel" class="hint-panel" hidden>
+              <div id="hint-content"></div>
+              <div class="hint-actions">
+                <button id="next-hint">Another hint</button
+                ><button id="solution-button">Show example solution</button>
+              </div>
+            </div>
+          </article>
+        </section>
+        <section class="code-column" aria-label="Code exercise">
+          <div class="editor-card">
+            <div class="editor-tabs" role="tablist" aria-label="Exercise files">
+              <button
+                id="tab-js"
+                class="selected"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-js"
+              >
+                quest.js</button
+              ><button
+                id="tab-html"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-html"
+              >
+                index.html</button
+              ><button
+                id="tab-preview"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-preview"
+              >
+                Preview</button
+              ><button
+                id="reset-code"
+                class="reset-code"
+                aria-label="Reset code to starter"
+                title="Reset code to starter"
+              >
+                ↺
+              </button>
+            </div>
+            <div
+              id="panel-js"
+              class="code-panel"
+              role="tabpanel"
+              aria-labelledby="tab-js"
+            >
+              <div id="editor"></div>
+            </div>
+            <div
+              id="panel-html"
+              class="code-panel html-panel"
+              role="tabpanel"
+              aria-labelledby="tab-html"
+              hidden
+            >
+              <div class="readonly-label">Read only</div>
+              <pre id="html-source"></pre>
+            </div>
+            <div
+              id="panel-preview"
+              class="code-panel preview-panel"
+              role="tabpanel"
+              aria-labelledby="tab-preview"
+              hidden
+            >
+              <div class="readonly-label">Run your code to update</div>
+              <iframe
+                id="dom-preview"
+                title="Exercise DOM result"
+                sandbox=""
+                referrerpolicy="no-referrer"
+              ></iframe>
+            </div>
+            <div class="test-section" id="test-section" hidden>
+              <p id="run-caption" class="run-caption"></p>
+              <div id="test-results" aria-live="polite"></div>
+              <div id="run-error" class="run-error" role="alert" hidden></div>
+            </div>
+            <div class="run-section">
+              <button id="run-button" class="run-button" title="⌘/Ctrl + Enter">
+                <span class="play-icon">▶</span
+                ><span id="run-label">Run code</span></button
+              ><button id="continue-button" class="continue-button" hidden>
+                On to the next quest <span>→</span>
+              </button>
             </div>
           </div>
         </section>
-        <div class="workspace">
-          <section class="adventure-column" aria-label="Island adventure">
-            <div class="world-card">
-              <div class="world-heading">
-                <div>
-                  <span class="world-eyebrow">YOUR WORLD</span>
-                  <h2 id="region-title">The sleeping shore</h2>
-                </div>
-                <button
-                  id="map-button"
-                  class="map-button"
-                  title="Open quest map"
-                >
-                  <span>▦</span> Quest map
-                </button>
-              </div>
-              <canvas
-                id="world"
-                tabindex="0"
-                role="img"
-                aria-label="Interactive isometric island. Enable Explore, then use arrow keys or WASD to move, or click a tile."
-              ></canvas>
-              <div class="world-tip" id="world-tip">
-                <span class="status-dot"></span> A quiet island. A little jQuery
-                can change that.
-              </div>
-              <div class="world-footer">
-                <span
-                  ><span class="map-dot"></span>
-                  <span id="world-status">12 discoveries ahead</span></span
-                ><button id="explore-button" aria-pressed="false">
-                  Explore island <span>↗</span>
-                </button>
-              </div>
-              <div class="movement-controls" id="movement-controls" hidden>
-                <button data-direction="up" aria-label="Move up">↑</button>
-                <div>
-                  <button data-direction="left" aria-label="Move left">←</button
-                  ><button data-direction="down" aria-label="Move down">
-                    ↓</button
-                  ><button data-direction="right" aria-label="Move right">
-                    →
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div
-              class="quest-path"
-              id="quest-path"
-              aria-label="Campaign quests"
-            ></div>
-            <article class="mission-card">
-              <div class="mission-meta">
-                <span id="mission-number">QUEST 01</span
-                ><span id="mission-concept">SELECTORS & TEXT</span
-                ><span class="reward-tag">+100 XP</span>
-              </div>
-              <h2 id="mission-title">Wake the beacon</h2>
-              <p class="mission-description" id="mission-description"></p>
-              <ul class="objectives" id="objectives"></ul>
-              <div class="guide-note">
-                <div class="guide-avatar" aria-hidden="true"></div>
-                <div>
-                  <span>FERN <small>YOUR ISLAND GUIDE</small></span>
-                  <p id="guide-note"></p>
-                </div>
-              </div>
-              <div class="mission-bottom">
-                <span id="source-label"></span
-                ><button id="hint-button">
-                  A little nudge? <span>↗</span>
-                </button>
-              </div>
-              <div id="hint-panel" class="hint-panel" hidden>
-                <div id="hint-content"></div>
-                <div class="hint-actions">
-                  <button id="next-hint">Another hint</button
-                  ><button id="solution-button">Show example solution</button>
-                </div>
-              </div>
-            </article>
-          </section>
-          <section class="code-column" aria-label="Code exercise">
-            <div class="editor-card">
-              <div class="editor-heading">
-                <div>
-                  <span class="code-icon">〈/〉</span
-                  ><span>Your spellbook</span>
-                </div>
-                <span class="runtime-badge"><i></i> jQuery 3.7.1</span>
-              </div>
-              <div
-                class="editor-tabs"
-                role="tablist"
-                aria-label="Exercise files"
-              >
-                <button
-                  id="tab-js"
-                  class="selected"
-                  role="tab"
-                  aria-selected="true"
-                  aria-controls="panel-js"
-                >
-                  <span class="js-icon">JS</span> quest.js
-                  <span class="file-dot"></span></button
-                ><button
-                  id="tab-html"
-                  role="tab"
-                  aria-selected="false"
-                  aria-controls="panel-html"
-                >
-                  <span class="html-icon">◇</span> index.html</button
-                ><button
-                  id="tab-preview"
-                  role="tab"
-                  aria-selected="false"
-                  aria-controls="panel-preview"
-                >
-                  Preview</button
-                ><button
-                  id="reset-code"
-                  class="reset-code"
-                  aria-label="Reset code to starter"
-                  title="Reset code to starter"
-                >
-                  ↺
-                </button>
-              </div>
-              <div
-                id="panel-js"
-                class="code-panel"
-                role="tabpanel"
-                aria-labelledby="tab-js"
-              >
-                <div id="editor"></div>
-              </div>
-              <div
-                id="panel-html"
-                class="code-panel html-panel"
-                role="tabpanel"
-                aria-labelledby="tab-html"
-                hidden
-              >
-                <div class="readonly-label">EXERCISE HTML · READ ONLY</div>
-                <pre id="html-source"></pre>
-              </div>
-              <div
-                id="panel-preview"
-                class="code-panel preview-panel"
-                role="tabpanel"
-                aria-labelledby="tab-preview"
-                hidden
-              >
-                <div class="readonly-label">
-                  DOM SNAPSHOT · RUN YOUR CODE TO UPDATE
-                </div>
-                <iframe
-                  id="dom-preview"
-                  title="Exercise DOM result"
-                  sandbox=""
-                  referrerpolicy="no-referrer"
-                ></iframe>
-              </div>
-              <div class="editor-status">
-                <span
-                  ><i></i>
-                  <span id="save-status">Changes saved locally</span></span
-                ><span
-                  >JavaScript
-                  <span class="status-separator">|</span> UTF-8</span
-                >
-              </div>
-              <div class="test-section">
-                <div class="test-heading">
-                  <span>THE CHECKPOINT <span id="test-count"></span></span
-                  ><span id="test-state">READY WHEN YOU ARE</span>
-                </div>
-                <div id="test-results" aria-live="polite"></div>
-                <div id="run-error" class="run-error" role="alert" hidden></div>
-              </div>
-              <div class="run-section">
-                <p id="run-caption">
-                  Your code. Real tests. A little island magic.
-                </p>
-                <button id="run-button" class="run-button">
-                  <span class="play-icon">▶</span
-                  ><span id="run-label">Run code</span><kbd>⌘ ↵</kbd></button
-                ><button id="continue-button" class="continue-button" hidden>
-                  On to the next quest <span>→</span>
-                </button>
-              </div>
-            </div>
-            <div class="learning-note">
-              <span class="note-icon">✳</span>
-              <p>
-                <strong>Not a simulation. Real jQuery.</strong>Your code runs
-                against real HTML in an isolated sandbox. Experiment, make
-                mistakes, try again.
-              </p>
-            </div>
-            <div class="quick-reference">
-              <span>THE MAGIC FORMULA</span
-              ><code
-                ><span>$(</span>"selector"<span>).</span>action<span
-                  >();</span
-                ></code
-              ><button
-                id="syntax-button"
-                aria-label="Open jQuery syntax reference"
-              >
-                ↗
-              </button>
-            </div>
-          </section>
-        </div>
-        <footer class="site-footer">
-          <span>Built for curious minds. No lives lost for learning.</span
-          ><a id="slides-link" target="_blank" rel="noopener"
-            >BASED ON YOUR JQUERY LECTURE <span>↗</span></a
-          >
-        </footer>
       </main>
     </div>
     <div id="toast" class="toast" role="status" hidden></div>
