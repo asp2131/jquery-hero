@@ -264,27 +264,30 @@ function renderTests() {
       ? "See your adventure <span>→</span>"
       : "On to the next quest <span>→</span>";
 }
-function setPreview(html) {
-  // This frame never executes scripts, and its CSP prevents network loads from user-created markup.
+function setScene(lesson, html) {
+  // DOMParser never runs scripts; the scene reads only text, inline styles, and classes.
   const doc = new DOMParser().parseFromString(html, "text/html");
-  doc
-    .querySelectorAll("script,iframe,object,embed,link,meta,base,form")
-    .forEach((el) => el.remove());
-  doc.querySelectorAll("*").forEach((el) => {
-    for (const attribute of [...el.attributes])
-      if (
-        attribute.name.startsWith("on") ||
-        ["href", "src", "srcset", "action", "formaction"].includes(
-          attribute.name,
-        )
-      )
-        el.removeAttribute(attribute.name);
-  });
-  $("dom-preview").srcdoc =
-    `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>body{font:14px/1.7 monospace;color:#345039;padding:12px;background:#f6f6eb}button,input{font:inherit;padding:5px 10px;margin:4px;border:1px solid #a3b88c;background:#e8f0da;border-radius:4px}button{pointer-events:none}.hidden{display:none}.lit,.awake{color:#6e9039}.italic{font-style:italic}</style></head><body>${doc.body.innerHTML}</body></html>`;
+  const props = [];
+  for (const el of doc.body.querySelectorAll("*")) {
+    const rule = lesson.scene.find(([selector]) => el.matches(selector));
+    if (!rule) continue;
+    const [, kind, lit = () => true] = rule;
+    let hidden = false;
+    for (let node = el; node; node = node.parentElement)
+      if (node.style.display === "none") hidden = true;
+    props.push({
+      kind,
+      lit: lit(el),
+      hidden,
+      text: el.textContent.trim(),
+      color: el.style.color,
+      background: el.style.backgroundColor,
+    });
+  }
+  world.setScene(props);
 }
 function selectTab(name) {
-  for (const tab of ["js", "html", "preview"]) {
+  for (const tab of ["js", "html"]) {
     const selected = name === tab;
     $(`tab-${tab}`).classList.toggle("selected", selected);
     $(`tab-${tab}`).setAttribute("aria-selected", String(selected));
@@ -323,7 +326,7 @@ function selectLesson(index, { fromWorld = false } = {}) {
   $("html-source").textContent = lesson.html;
   $("hint-panel").hidden = true;
   selectTab("js");
-  setPreview(lesson.html);
+  setScene(lesson, lesson.html);
   renderTests();
   renderProgress();
   save();
@@ -366,7 +369,7 @@ async function execute() {
       return;
     }
     currentResult = result;
-    setPreview(result.html || lesson.html);
+    setScene(lesson, result.html || lesson.html);
     const passed =
       !result.error &&
       result.tests.length > 0 &&
@@ -516,7 +519,7 @@ function confirmReset() {
     });
     currentResult = null;
     renderTests();
-    setPreview(lessons[state.active].html);
+    setScene(lessons[state.active], lessons[state.active].html);
     selectTab("js");
     editor.focus();
   };
@@ -557,15 +560,15 @@ document.querySelectorAll("[data-direction]").forEach((btn) => {
     world.move(btn.dataset.direction);
   };
 });
-for (const name of ["js", "html", "preview"]) {
+for (const name of ["js", "html"]) {
   $(`tab-${name}`).onclick = () => selectTab(name);
   $(`tab-${name}`).onkeydown = (event) => {
-    const tabs = ["js", "html", "preview"];
+    const tabs = ["js", "html"];
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     const next =
       tabs[
-        (tabs.indexOf(name) + (event.key === "ArrowRight" ? 1 : 2)) %
+        (tabs.indexOf(name) + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) %
           tabs.length
       ];
     selectTab(next);

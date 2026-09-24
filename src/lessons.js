@@ -30,6 +30,7 @@ const test = (label, assertions, options = {}) => ({
   ...options,
 });
 
+// scene: [selector, prop kind, lit?] — how each element appears in the game panel.
 export const lessons = [
   {
     id: 0,
@@ -47,6 +48,7 @@ export const lessons = [
     starter:
       '// The beacon says "Sleeping" right now (peek at the index.html tab).\n// Select it and give it a new message.\n$("#beacon").text( );',
     html: '<section><h2 id="beacon">Sleeping</h2><p id="sign">Camp</p></section>',
+    scene: [["#beacon", "beacon", (el) => el.textContent === "Awake"], ["#sign", "sign"]],
     hints: [
       "An ID selector starts with #. Use #beacon, not beacon.",
       "A word passed to .text() must be a quoted string.",
@@ -80,6 +82,7 @@ export const lessons = [
     starter:
       '// A dot selects a class shared by several elements.\n$(".seedling").text("");',
     html: '<section><h2>The quiet grove</h2><p class="seedling">Dormant</p><p class="seedling">Dormant</p><p class="seedling">Dormant</p><p id="old-tree">Ancient oak</p></section>',
+    scene: [[".seedling", "tree", (el) => el.textContent === "Growing"], ["#old-tree", "tree"]],
     hints: [
       "Select .seedling, including the dot.",
       'The same .text("Growing") call can update all three seedlings.',
@@ -114,6 +117,7 @@ export const lessons = [
     starter:
       '// Give the pools their blue water back.\n$(".pool").css("background-color", "gray");\n// Then change the coral text color.',
     html: '<section><h2>Tide pools</h2><p class="pool" style="background-color:gray;padding:10px">North pool</p><p class="pool" style="background-color:gray;padding:10px">South pool</p><p id="coral" style="color:gray">Coral</p><p id="sand" style="background-color:tan;padding:10px">Dry sand</p></section>',
+    scene: [[".pool", "patch"], ["#coral", "flowers"], ["#sand", "patch"]],
     hints: [
       'Use .css("background-color", "blue") for the pools.',
       "The coral needs the color property, not background-color.",
@@ -154,6 +158,7 @@ export const lessons = [
     starter:
       '// Change only the bridge’s state classes.\n$("#bridge").removeClass("");\n$("#bridge").addClass("");',
     html: '<section><h2 id="bridge" class="stone broken">Mossy bridge</h2><p id="warning" class="caution">Watch your step</p></section>',
+    scene: [["#bridge", "bridge", (el) => el.matches(".repaired:not(.broken)")], ["#warning", "sign"]],
     hints: [
       "The selector is #bridge, and the class name is broken without a dot.",
       "Remove broken, then add repaired.",
@@ -193,6 +198,7 @@ export const lessons = [
     starter:
       '// Hide the fog, then reveal the ferry.\n$(".fog").hide();\n// Your ferry selection goes here.',
     html: '<section><h2 id="lighthouse">Harbor light</h2><p class="fog">Fog over the water</p><p class="fog">Fog over the pier</p><p id="ferry" style="display:none">The ferry is ready</p></section>',
+    scene: [["#lighthouse", "beacon"], [".fog", "fog"], ["#ferry", "boat"]],
     hints: [
       "Use a class selector for the two fog banks.",
       'Use $("#ferry").show() to reveal the boat.',
@@ -231,6 +237,7 @@ export const lessons = [
     starter:
       '// Angle brackets create a new element.\nconst $marker = $("<p>");\n// Set its id, text, and data-direction, then append it to #trail.',
     html: '<section><h2>Trailhead</h2><div id="trail"><p id="welcome">Welcome, explorer</p></div></section>',
+    scene: [["#welcome", "sign"], ["#crystal-marker", "crystal"]],
     hints: [
       "Save the new element in $marker so you can keep working on it.",
       "Set two attributes: id to crystal-marker and data-direction to east.",
@@ -270,6 +277,7 @@ export const lessons = [
     starter:
       '// Rescue first; clear the ruins second.\nconst $sapling = $("#sapling");\n// Detach it, empty #ruins, and move it into #nursery.',
     html: '<section><h2>The old ruins</h2><div id="ruins"><p class="rubble">Fallen stones</p><p id="sapling" class="healthy">Last sapling</p><p class="rubble">Broken branches</p></div><div id="nursery"></div></section>',
+    scene: [[".rubble", "ruin"], ["#nursery", "patch"], ["#sapling", "tree", (el) => el.matches(".healthy")]],
     hints: [
       'Save $("#sapling").detach() in a variable before clearing its old home.',
       '$("#ruins").empty() clears all remaining content.',
@@ -319,6 +327,7 @@ export const lessons = [
     starter:
       '// Cache the selection, then build a chain of changes.\nconst $tower = $("#lookout");\n$tower.text("Ready");',
     html: '<section><h2 id="lookout" class="tower" title="Abandoned" style="color:gray">Silent</h2><p id="dock" title="South landing">Dock</p></section>',
+    scene: [["#lookout", "beacon", (el) => el.matches(".restored")], ["#dock", "sign"]],
     hints: [
       'Continue the chain with .addClass("restored").',
       'Use .css("color", "limegreen") and .attr("title", "Northern lookout").',
@@ -362,6 +371,7 @@ export const lessons = [
     starter:
       'function toggleGate() {\n  // Read the gate text and choose its opposite state.\n}\n\n// Pass the function, without calling it.\n$("#gate-switch").on("click", toggleGate);',
     html: '<section><h2>Garden gate</h2><p id="gate">Closed</p><button id="gate-switch" type="button">Toggle gate</button><p id="garden">Seeds are safe</p></section>',
+    scene: [["#gate", "gate", (el) => el.textContent === "Open"], ["#gate-switch", "sign"], ["#garden", "flowers"]],
     hints: [
       'Read $("#gate").text() inside the function.',
       "If it equals Closed, set Open. Otherwise set Closed.",
@@ -412,6 +422,7 @@ export const lessons = [
     starter:
       'let flips = 0;\n\nfunction flipCoin() {\n  // Draw a random number here, then show Heads or Tails.\n  // Increase flips and update #flip-count.\n}\n\n$("#flip").on("click", flipCoin);',
     html: '<section><h2>Wishing well</h2><p id="coin">Ready</p><p>Wishes: <span id="flip-count">0</span></p><button id="flip" type="button">Flip a coin</button></section>',
+    scene: [["#coin", "crystal"], ["#flip-count", "sign"], ["#flip", "sign"]],
     hints: [
       "Use if (Math.random() > 0.5) inside flipCoin.",
       "Set #coin to Heads in the if branch and Tails in the else branch.",
@@ -474,6 +485,7 @@ export const lessons = [
     starter:
       'function paintName() {\n  // Read #ship-name with .val(), then update #name-preview.\n}\n\nfunction paintSail() {\n  // Read #sail-color, then change the color of #sail.\n}\n\n$("#ship-name").on("keyup", paintName);\n$("#sail-color").on("change", paintSail);',
     html: '<section><h2>Shipwright’s dock</h2><label>Ship name <input id="ship-name" value="Seabird"></label><p id="name-preview">Seabird</p><label>Sail color <select id="sail-color"><option value="blue">Blue</option><option value="green">Green</option><option value="gold">Gold</option></select></label><p id="sail" style="color:blue">Set sail</p></section>',
+    scene: [["#name-preview", "sign"], ["#sail", "boat"]],
     hints: [
       'Inside paintName, use $("#name-preview").text($("#ship-name").val());',
       'Inside paintSail, use .css("color", $("#sail-color").val()).',
@@ -556,6 +568,7 @@ export const lessons = [
     starter:
       'let rolls = 0;\nconst $die = $("#die");\nconst $count = $("#roll-count");\n\nfunction rollDie() {\n  // Turn a fresh random number into an integer from 1 to 6.\n  // Display it, increase rolls, and update the counter.\n}\n\n$("#roll").on("click", rollDie);',
     html: '<section><h2>Expedition dice</h2><p id="die">Ready</p><p>Rolls: <span id="roll-count">0</span></p><button id="roll" type="button">Roll the die</button><p id="expedition-note">The horizon is yours</p></section>',
+    scene: [["#die", "crystal"], ["#roll-count", "sign"], ["#roll", "sign"], ["#expedition-note", "sign"]],
     hints: [
       "The die value is Math.floor(Math.random() * 6) + 1.",
       "Inside rollDie, set $die.text(result), increase rolls, then set $count.text(rolls).",

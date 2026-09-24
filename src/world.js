@@ -205,6 +205,10 @@ export function createWorld(
   let height = 1;
   let dpr = 1;
   let camera = { x: 0, y: 0, scale: 1 };
+  let islandCamera = camera;
+  let props = [];
+  let propTiles = new Set();
+  let placedProps = [];
   let animationId = 0;
   let lastFrame = 0;
   let destination = null;
@@ -660,6 +664,7 @@ export function createWorld(
     } else {
       diamond(ctx, x, y - 27, 4, 6, "#94a18a");
     }
+    if (!exploring && !selected) return;
     const radius = Math.max(10, Math.min(13, 9.5 / camera.scale));
     const labelY = y - 46;
     ellipse(
@@ -684,9 +689,13 @@ export function createWorld(
     const bob = reducedMotion.matches
       ? 0
       : Math.sin(time / 400 + object.index) * 2;
-    const x = point.x;
-    const y = point.y - 10 + bob;
-    ellipse(ctx, x, point.y + 1, 9, 4, "#f2cc7440");
+    drawGem(point.x, point.y, bob);
+  }
+
+  function drawGem(px, py, bob = 0) {
+    const x = px;
+    const y = py - 10 + bob;
+    ellipse(ctx, x, py + 1, 9, 4, "#f2cc7440");
     const glow = ctx.createRadialGradient(x, y, 0, x, y, 21);
     glow.addColorStop(0, "#ffd56a45");
     glow.addColorStop(1, "#ffd56a00");
@@ -727,6 +736,166 @@ export function createWorld(
     ctx.fillStyle = "#fff2be";
     ctx.fillRect(x + 12, y - 10, 1, 5);
     ctx.fillRect(x + 10, y - 8, 5, 1);
+  }
+
+  // Scene props mirror the quest's DOM: each mapped element becomes one object near the beacon.
+  function placeProps() {
+    const [lx, ly] = LANDMARKS[active];
+    const reserved = new Set([
+      ...LANDMARKS.map(([x, y]) => keyOf(x, y)),
+      ...rewards.map(({ x, y }) => keyOf(x, y)),
+    ]);
+    const slots = [];
+    for (let dy = -3; dy <= 3; dy += 1)
+      for (let dx = -3; dx <= 3; dx += 1) {
+        const tile = tiles.get(keyOf(lx + dx, ly + dy));
+        if (tile && !tile.bridge && !reserved.has(keyOf(tile.x, tile.y)))
+          slots.push({
+            x: tile.x,
+            y: tile.y,
+            // Nearest first, off the trail first, and toward the camera so labels stay clear.
+            rank: Math.max(Math.abs(dx), Math.abs(dy)) * 10 + (tile.path ? 5 : 0) - (dx + dy) * 0.1,
+          });
+      }
+    slots.sort((a, b) => a.rank - b.rank);
+    const visible = props.slice(0, slots.length);
+    propTiles = new Set(visible.map((_, i) => keyOf(slots[i].x, slots[i].y)));
+    placedProps = visible.map((prop, i) => ({
+      x: slots[i].x,
+      y: slots[i].y,
+      type: "prop",
+      prop,
+      row: i,
+    }));
+  }
+
+  // Tall scenery near the active quest would hide its props while coding.
+  function onStage(object) {
+    if (exploring || (object.type !== "tree" && object.type !== "ruin"))
+      return false;
+    const [lx, ly] = LANDMARKS[active];
+    return Math.max(Math.abs(object.x - lx), Math.abs(object.y - ly)) <= 3;
+  }
+
+  function setScene(nextProps) {
+    props = Array.isArray(nextProps) ? nextProps : [];
+    placeProps();
+    render();
+    requestFrame();
+  }
+
+  function drawLabel(text, x, y, color) {
+    if (!text) return;
+    const label = text.length > 18 ? `${text.slice(0, 17)}…` : text;
+    ctx.font = "600 7px ui-monospace, SFMono-Regular, monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const w = ctx.measureText(label).width + 8;
+    ctx.fillStyle = "#132e2ce6";
+    ctx.fillRect(x - w / 2, y - 6, w, 12);
+    ctx.fillStyle = "#9dbb94";
+    ctx.fillRect(x - w / 2, y + 5, w, 1);
+    ctx.fillStyle = color || "#f0efd1";
+    ctx.fillText(label, x, y + 0.5);
+  }
+
+  function drawProp(object, time) {
+    const { prop } = object;
+    if (prop.hidden) return;
+    const { x, y } = project(object.x, object.y);
+    const lit = prop.lit;
+    const base = { x: object.x, y: object.y, stage: 0, variant: 0.6 };
+    let top = y - 30;
+    if (prop.kind === "beacon") {
+      diamond(ctx, x, y + 2, 10, 5, "#5d8678");
+      ctx.fillStyle = "#c4c6a1";
+      ctx.fillRect(x - 2, y - 24, 4, 24);
+      if (lit) {
+        const glow = ctx.createRadialGradient(x, y - 26, 0, x, y - 26, 16);
+        glow.addColorStop(0, "#ffe7a060");
+        glow.addColorStop(1, "#ffe7a000");
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - 16, y - 42, 32, 32);
+        diamond(ctx, x, y - 27, 5, 8, prop.color || "#ffe293");
+        diamond(ctx, x - 1, y - 28, 2, 5, "#fff4ca");
+      } else diamond(ctx, x, y - 26, 4, 5, "#7a8c79");
+      top = y - 44;
+    } else if (prop.kind === "tree") {
+      if (lit) {
+        drawTree(base);
+        top = y - 56;
+      } else {
+        ctx.fillStyle = "#806c51";
+        ctx.fillRect(x - 1, y - 9, 2, 9);
+        ellipse(ctx, x - 4, y - 9, 4, 2, "#62a67b");
+        ellipse(ctx, x + 4, y - 11, 4, 2, "#7ab785");
+        top = y - 22;
+      }
+    } else if (prop.kind === "flowers") {
+      drawFlowers(base);
+      top = y - 20;
+    } else if (prop.kind === "ruin") {
+      drawRuin(base);
+      top = y - 44;
+    } else if (prop.kind === "crystal") {
+      drawGem(x, y, reducedMotion.matches ? 0 : Math.sin(time / 400) * 2);
+      top = y - 30;
+    } else if (prop.kind === "patch") {
+      diamond(ctx, x, y + 1, 19, 9.5, prop.background || "#6b5a48", "#132e2c55");
+      top = y - 14;
+    } else if (prop.kind === "fog") {
+      ctx.save();
+      ctx.translate(x, y - 14);
+      ctx.scale(0.42, 0.42);
+      for (const [dx, alpha] of [[0, 0.8], [-8, 0.5]]) {
+        ctx.fillStyle = `rgba(200, 222, 214, ${alpha})`;
+        ctx.beginPath();
+        ctx.ellipse(dx, 0, 44, 16, 0, 0, Math.PI * 2);
+        ctx.ellipse(dx - 12, -12, 20, 14, 0, 0, Math.PI * 2);
+        ctx.ellipse(dx + 14, -10, 18, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      top = y - 30;
+    } else if (prop.kind === "boat") {
+      ellipse(ctx, x, y + 3, 17, 5, "#0a353a70");
+      polygon(ctx, [[x - 16, y - 4], [x + 16, y - 4], [x + 10, y + 3], [x - 11, y + 3]], "#806c51");
+      ctx.fillStyle = "#c4c6a1";
+      ctx.fillRect(x - 1, y - 30, 2, 26);
+      polygon(ctx, [[x + 1, y - 29], [x + 13, y - 8], [x + 1, y - 7]], prop.color || "#e8e2c4");
+      top = y - 40;
+    } else if (prop.kind === "bridge") {
+      diamond(ctx, x, y + 3, 20, 9, "#634d3d");
+      if (lit) diamond(ctx, x, y, 20, 9, "#bea272");
+      else {
+        polygon(ctx, [[x - 20, y], [x - 4, y - 8], [x - 1, y - 5], [x - 17, y + 3]], "#8b7a5c");
+        polygon(ctx, [[x + 3, y + 5], [x + 19, y - 3], [x + 16, y + 1], [x + 1, y + 9]], "#8b7a5c");
+      }
+      for (const side of [-1, 1]) {
+        ctx.fillStyle = "#ceb17c";
+        ctx.fillRect(x + side * 16 - 1, y - 12, 3, 14);
+      }
+      top = y - 24;
+    } else if (prop.kind === "gate") {
+      ctx.fillStyle = "#806c51";
+      ctx.fillRect(x - 14, y - 20, 4, 22);
+      ctx.fillRect(x + 10, y - 20, 4, 22);
+      ctx.fillStyle = "#bea272";
+      if (lit) ctx.fillRect(x + 6, y - 30, 3, 20);
+      else {
+        ctx.fillRect(x - 10, y - 16, 20, 3);
+        ctx.fillRect(x - 10, y - 8, 20, 3);
+      }
+      top = y - 34;
+    } else {
+      // Default "sign": a post whose board is the element's text.
+      ctx.fillStyle = "#806c51";
+      ctx.fillRect(x - 1, y - 18, 3, 19);
+      ellipse(ctx, x, y + 1, 6, 3, "#0a353a50");
+      top = y - 22;
+    }
+    // Alternate label heights so neighbours' text does not collide.
+    drawLabel(prop.text, x, top - (object.row % 2) * 9, prop.color);
   }
 
   function heroPosition(now) {
@@ -803,7 +972,13 @@ export function createWorld(
     const position = heroPosition(now);
     const depth = position.x + position.y;
     let heroDrawn = false;
-    for (const object of scenery) {
+    const objects = placedProps.length
+      ? [
+          ...scenery.filter((o) => !propTiles.has(keyOf(o.x, o.y)) && !onStage(o)),
+          ...placedProps,
+        ].sort((a, b) => a.x + a.y - b.x - b.y || a.x - b.x)
+      : scenery;
+    for (const object of objects) {
       if (!heroDrawn && object.x + object.y > depth) {
         drawHero(position, now);
         heroDrawn = true;
@@ -813,6 +988,7 @@ export function createWorld(
       else if (object.type === "flowers") drawFlowers(object);
       else if (object.type === "shrub") drawShrub(object);
       else if (object.type === "beacon") drawBeacon(object, motionTime);
+      else if (object.type === "prop") drawProp(object, motionTime);
       else drawCrystal(object, motionTime);
     }
     if (!heroDrawn) drawHero(position, now);
@@ -1031,7 +1207,7 @@ export function createWorld(
         (height - topMargin - bottomMargin) / (maxY - minY),
       ),
     );
-    camera = {
+    islandCamera = {
       scale,
       x: width / 2,
       y:
@@ -1039,6 +1215,22 @@ export function createWorld(
         (height - topMargin - bottomMargin - (maxY - minY) * scale) / 2 -
         minY * scale,
     };
+    frameCamera();
+  }
+
+  // While coding, zoom onto the active quest so its scene props read as the preview.
+  function frameCamera() {
+    if (exploring) camera = islandCamera;
+    else {
+      const [lx, ly] = LANDMARKS[active];
+      const point = project(lx, ly);
+      const scale = Math.min(islandCamera.scale * 3.6, 3);
+      camera = {
+        scale,
+        x: width / 2 - point.x * scale,
+        y: height * 0.56 - point.y * scale,
+      };
+    }
     paintBackdrop();
     render();
     requestFrame();
@@ -1071,9 +1263,8 @@ export function createWorld(
       route = [];
       destination = null;
     }
-    paintBackdrop();
-    render();
-    requestFrame();
+    placeProps();
+    frameCamera();
   }
 
   function travelTo(index) {
@@ -1099,8 +1290,7 @@ export function createWorld(
       step = null;
       destination = null;
     }
-    render();
-    requestFrame();
+    frameCamera();
   }
 
   const onFocus = () => {
@@ -1149,6 +1339,7 @@ export function createWorld(
 
   return {
     setProgress,
+    setScene,
     travelTo,
     setExploring,
     move,

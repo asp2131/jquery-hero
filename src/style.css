@@ -443,18 +443,6 @@ a {
   color: #b8c7a2;
   margin: 0;
 }
-.preview-panel {
-  display: flex;
-  flex-direction: column;
-  padding: 18px;
-}
-.preview-panel iframe {
-  flex: 1;
-  width: 100%;
-  border: 0;
-  background: #f6f6eb;
-  border-radius: 6px;
-}
 .test-section {
   padding: 16px 22px 4px;
   border-top: 1px solid #2b3e30;
