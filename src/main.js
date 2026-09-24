@@ -255,6 +255,10 @@ function renderTests() {
   $("run-error").hidden = !currentResult?.error;
   $("run-error").textContent = currentResult?.error || "";
   $("continue-button").hidden = !state.completed.includes(state.active);
+  // Once a quest is done, moving on becomes the primary action.
+  document
+    .querySelector(".run-section")
+    .classList.toggle("complete", state.completed.includes(state.active));
   $("continue-button").innerHTML =
     state.active === lessons.length - 1
       ? "See your adventure <span>→</span>"

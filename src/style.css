@@ -520,6 +520,8 @@ a {
   overflow-wrap: anywhere;
 }
 .run-section {
+  display: flex;
+  flex-direction: column;
   padding: 16px 22px 20px;
 }
 .run-button {
@@ -560,6 +562,29 @@ a {
   font-size: 14px;
   font-weight: 600;
   padding: 8px;
+}
+.run-section.complete .continue-button {
+  order: -1;
+  margin: 0 0 12px;
+  height: 48px;
+  background: var(--lime);
+  border-radius: 8px;
+  color: #253b20;
+  box-shadow: 0 3px 0 #8daa62;
+  font-size: 15px;
+  font-weight: 750;
+}
+.run-section.complete .continue-button:hover {
+  background: #e1ffad;
+}
+.run-section.complete .run-button {
+  height: auto;
+  padding: 8px;
+  background: none;
+  box-shadow: none;
+  color: #cbe5a0;
+  font-size: 14px;
+  font-weight: 600;
 }
 .toast {
   position: fixed;
