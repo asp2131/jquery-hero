@@ -1,0 +1,26 @@
+{
+  "name": "jquery-quest",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "jquery": "3.7.1",
+    "acorn": "^8.15.0",
+    "acorn-walk": "^8.3.4",
+    "magic-string": "^0.30.21",
+    "@codemirror/commands": "^6.10.0",
+    "@codemirror/lang-javascript": "^6.2.4",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.6",
+    "@codemirror/language": "^6.11.3",
+    "@lezer/highlight": "^1.2.3"
+  },
+  "devDependencies": {
+    "vite": "^7.1.7"
+  }
+}
