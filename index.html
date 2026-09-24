@@ -60,15 +60,15 @@
               role="img"
               aria-label="Interactive isometric island. Enable Explore, then use arrow keys or WASD to move, or click a tile."
             ></canvas>
-            <div class="world-tip" id="world-tip" hidden>
-              Click a tile or use WASD / arrows. Follow the gold crystals.
+            <div class="world-tip" id="world-tip" role="status" hidden>
+              Hold WASD / arrows to walk · Shift to sprint · Click to travel ·
+              Esc to stop
             </div>
             <div class="movement-controls" id="movement-controls" hidden>
               <button data-direction="up" aria-label="Move up">↑</button>
               <div>
                 <button data-direction="left" aria-label="Move left">←</button
-                ><button data-direction="down" aria-label="Move down">
-                  ↓</button
+                ><button data-direction="down" aria-label="Move down">↓</button
                 ><button data-direction="right" aria-label="Move right">
                   →
                 </button>

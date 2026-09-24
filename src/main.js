@@ -95,7 +95,9 @@ function save() {
     storageAvailable = false;
   }
   if (wasAvailable && !storageAvailable)
-    toast("Progress can't be saved in this browser. It lasts this session only.");
+    toast(
+      "Progress can't be saved in this browser. It lasts this session only.",
+    );
 }
 function toast(message) {
   clearTimeout(toastTimer);
@@ -191,6 +193,10 @@ const editor = new EditorView({
   parent: $("editor"),
 });
 const world = createWorld($("world"), {
+  onStatus(message) {
+    if ($("world-tip").textContent !== message)
+      $("world-tip").textContent = message;
+  },
   onCollect(index) {
     if (!state.completed.includes(index) || state.collected.includes(index))
       return;
@@ -473,7 +479,7 @@ function showGuide() {
   showDialog(
     "A pocket guide to jQuery.",
     "YOUR FIELD GUIDE",
-    `<p class="dialog-copy">No need to memorize everything. Keep experimenting. Your progress is saved in this browser; no account or server is involved.</p>${sections.map(([title, code, text]) => `<section class="reference-section"><h3>${title}</h3><code>${escapeHTML(code)}</code><p>${escapeHTML(text)}</p></section>`).join("")}<section class="reference-section"><h3>Explore your island</h3><p>Press Explore island, then use arrow keys, WASD, the on-screen arrows, or click a tile. Walk onto golden crystals near completed beacons to collect them. Paths open as you pass exercises. Click a quest number to revisit it. In the editor, use Tab to indent and Cmd/Ctrl + Enter to run.</p></section>`,
+    `<p class="dialog-copy">No need to memorize everything. Keep experimenting. Your progress is saved in this browser; no account or server is involved.</p>${sections.map(([title, code, text]) => `<section class="reference-section"><h3>${title}</h3><code>${escapeHTML(code)}</code><p>${escapeHTML(text)}</p></section>`).join("")}<section class="reference-section"><h3>Explore your island</h3><p>Press Explore island, then hold arrow keys, WASD, or the on-screen arrows to walk. Hold Shift to sprint. Click a tile or quest number to follow a dotted route around obstacles; press Escape to stop at the next tile. Gold crystals near completed beacons go into your pack when you reach them. Dim paths open as you pass exercises. Returning to the editor stops held movement. In the editor, use Tab to indent and Cmd/Ctrl + Enter to run.</p></section>`,
   );
 }
 function showCompletion() {
@@ -555,7 +561,21 @@ $("solution-button").onclick = () => {
 $("reset-code").onclick = confirmReset;
 $("explore-button").onclick = () => setExploring(!exploring);
 document.querySelectorAll("[data-direction]").forEach((btn) => {
-  btn.onclick = () => {
+  btn.onpointerdown = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    if (!exploring) setExploring(true);
+    world.focus();
+    btn.setPointerCapture(event.pointerId);
+    world.setDirection(btn.dataset.direction, true);
+  };
+  const release = () => world.setDirection(btn.dataset.direction, false);
+  btn.onpointerup = release;
+  btn.onpointercancel = release;
+  btn.onlostpointercapture = release;
+  // Keyboard and assistive-technology activation remains a single step.
+  btn.onclick = (event) => {
+    if (event.detail !== 0) return;
     if (!exploring) setExploring(true);
     world.move(btn.dataset.direction);
   };
@@ -568,7 +588,8 @@ for (const name of ["js", "html"]) {
     event.preventDefault();
     const next =
       tabs[
-        (tabs.indexOf(name) + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) %
+        (tabs.indexOf(name) +
+          (event.key === "ArrowRight" ? 1 : tabs.length - 1)) %
           tabs.length
       ];
     selectTab(next);

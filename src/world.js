@@ -1,3 +1,5 @@
+import Phaser from "phaser";
+
 const HERO_URL = new URL(
   "../IsometricBaseCharacter/Base_SpriteSheet.png",
   import.meta.url,
@@ -9,6 +11,9 @@ const TERRAIN_URL = new URL(
 const HALF_WIDTH = 24;
 const HALF_HEIGHT = 12;
 const STEP_TIME = 165;
+const SPRINT_TIME = 100;
+const EXPLORE_TIP =
+  "Hold WASD / arrows to walk · Shift to sprint · Click to travel · Esc to stop";
 const LANDMARKS = [
   [1, 8],
   [2, 6],
@@ -171,7 +176,7 @@ function makeIsland() {
 /** A self-contained island. Progress is supplied by the app; rewards require a walking visit. */
 export function createWorld(
   canvas,
-  { onCollect = () => {}, onReach = () => {} } = {},
+  { onCollect = () => {}, onReach = () => {}, onStatus = () => {} } = {},
 ) {
   const ctx = canvas.getContext("2d");
   if (!ctx)
@@ -179,7 +184,6 @@ export function createWorld(
   const { tiles, scenery, rewards, sortedTiles } = makeIsland();
   const backdrop = document.createElement("canvas");
   const backgroundContext = backdrop.getContext("2d");
-  const heroImage = new Image();
   const terrainImage = new Image();
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const originalTabIndex = canvas.getAttribute("tabindex");
@@ -188,7 +192,7 @@ export function createWorld(
   canvas.tabIndex = 0;
   canvas.setAttribute(
     "aria-label",
-    "Quest island. In explore mode, use arrow keys or W A S D to walk, or click a tile. Walk onto golden crystals to collect them.",
+    "Quest island. In explore mode, hold arrow keys or W A S D to walk, Shift to sprint, or click a tile to travel. Escape stops your route. Walk onto golden crystals to collect them.",
   );
   let completed = new Set();
   let collected = new Set();
@@ -209,8 +213,16 @@ export function createWorld(
   let props = [];
   let propTiles = new Set();
   let placedProps = [];
-  let animationId = 0;
-  let lastFrame = 0;
+  let game;
+  let scene;
+  let heroSprite;
+  let clock = 0;
+  let objects = scenery;
+  let sprinting = false;
+  let celebratingUntil = 0;
+  let hoverTile = null;
+  let blockedTile = null;
+  const heldDirections = new Map();
   let destination = null;
   let collectionBurst = null;
   let focused = false;
@@ -754,7 +766,10 @@ export function createWorld(
             x: tile.x,
             y: tile.y,
             // Nearest first, off the trail first, and toward the camera so labels stay clear.
-            rank: Math.max(Math.abs(dx), Math.abs(dy)) * 10 + (tile.path ? 5 : 0) - (dx + dy) * 0.1,
+            rank:
+              Math.max(Math.abs(dx), Math.abs(dy)) * 10 +
+              (tile.path ? 5 : 0) -
+              (dx + dy) * 0.1,
           });
       }
     slots.sort((a, b) => a.rank - b.rank);
@@ -767,6 +782,13 @@ export function createWorld(
       prop,
       row: i,
     }));
+    objects = [
+      ...scenery.filter(
+        (object) =>
+          !propTiles.has(keyOf(object.x, object.y)) && !onStage(object),
+      ),
+      ...placedProps,
+    ].sort((a, b) => a.x + a.y - b.x - b.y || a.x - b.x);
   }
 
   // Tall scenery near the active quest would hide its props while coding.
@@ -781,7 +803,6 @@ export function createWorld(
     props = Array.isArray(nextProps) ? nextProps : [];
     placeProps();
     render();
-    requestFrame();
   }
 
   function drawLabel(text, x, y, color) {
@@ -841,13 +862,24 @@ export function createWorld(
       drawGem(x, y, reducedMotion.matches ? 0 : Math.sin(time / 400) * 2);
       top = y - 30;
     } else if (prop.kind === "patch") {
-      diamond(ctx, x, y + 1, 19, 9.5, prop.background || "#6b5a48", "#132e2c55");
+      diamond(
+        ctx,
+        x,
+        y + 1,
+        19,
+        9.5,
+        prop.background || "#6b5a48",
+        "#132e2c55",
+      );
       top = y - 14;
     } else if (prop.kind === "fog") {
       ctx.save();
       ctx.translate(x, y - 14);
       ctx.scale(0.42, 0.42);
-      for (const [dx, alpha] of [[0, 0.8], [-8, 0.5]]) {
+      for (const [dx, alpha] of [
+        [0, 0.8],
+        [-8, 0.5],
+      ]) {
         ctx.fillStyle = `rgba(200, 222, 214, ${alpha})`;
         ctx.beginPath();
         ctx.ellipse(dx, 0, 44, 16, 0, 0, Math.PI * 2);
@@ -859,17 +891,52 @@ export function createWorld(
       top = y - 30;
     } else if (prop.kind === "boat") {
       ellipse(ctx, x, y + 3, 17, 5, "#0a353a70");
-      polygon(ctx, [[x - 16, y - 4], [x + 16, y - 4], [x + 10, y + 3], [x - 11, y + 3]], "#806c51");
+      polygon(
+        ctx,
+        [
+          [x - 16, y - 4],
+          [x + 16, y - 4],
+          [x + 10, y + 3],
+          [x - 11, y + 3],
+        ],
+        "#806c51",
+      );
       ctx.fillStyle = "#c4c6a1";
       ctx.fillRect(x - 1, y - 30, 2, 26);
-      polygon(ctx, [[x + 1, y - 29], [x + 13, y - 8], [x + 1, y - 7]], prop.color || "#e8e2c4");
+      polygon(
+        ctx,
+        [
+          [x + 1, y - 29],
+          [x + 13, y - 8],
+          [x + 1, y - 7],
+        ],
+        prop.color || "#e8e2c4",
+      );
       top = y - 40;
     } else if (prop.kind === "bridge") {
       diamond(ctx, x, y + 3, 20, 9, "#634d3d");
       if (lit) diamond(ctx, x, y, 20, 9, "#bea272");
       else {
-        polygon(ctx, [[x - 20, y], [x - 4, y - 8], [x - 1, y - 5], [x - 17, y + 3]], "#8b7a5c");
-        polygon(ctx, [[x + 3, y + 5], [x + 19, y - 3], [x + 16, y + 1], [x + 1, y + 9]], "#8b7a5c");
+        polygon(
+          ctx,
+          [
+            [x - 20, y],
+            [x - 4, y - 8],
+            [x - 1, y - 5],
+            [x - 17, y + 3],
+          ],
+          "#8b7a5c",
+        );
+        polygon(
+          ctx,
+          [
+            [x + 3, y + 5],
+            [x + 19, y - 3],
+            [x + 16, y + 1],
+            [x + 1, y + 9],
+          ],
+          "#8b7a5c",
+        );
       }
       for (const side of [-1, 1]) {
         ctx.fillStyle = "#ceb17c";
@@ -900,14 +967,14 @@ export function createWorld(
 
   function heroPosition(now) {
     if (!step || reducedMotion.matches) return step ? step.to : hero;
-    const progress = Math.min(1, (now - step.start) / STEP_TIME);
+    const progress = Math.min(1, (now - step.start) / step.duration);
     return {
       x: step.from.x + (step.to.x - step.from.x) * progress,
       y: step.from.y + (step.to.y - step.from.y) * progress,
     };
   }
 
-  function drawHero(position, now) {
+  function drawHeroShadow(position) {
     const { x, y } = project(position.x, position.y);
     ellipse(ctx, x, y + 1, 11, 5, "#0a353a70");
     if (exploring) {
@@ -916,18 +983,6 @@ export function createWorld(
       ctx.beginPath();
       ctx.ellipse(x, y + 1, 14, 7, 0, 0, Math.PI * 2);
       ctx.stroke();
-    }
-    if (heroImage.complete && heroImage.naturalWidth) {
-      const frame =
-        step && !reducedMotion.matches ? Math.floor(now / 95) % 4 : 0;
-      const row = hero.facing === 1 ? 1 : hero.facing === 2 ? 2 : 0;
-      ctx.imageSmoothingEnabled = false;
-      ctx.save();
-      ctx.translate(x, y - 20);
-      if (hero.facing === 3) ctx.scale(-1, 1);
-      ctx.drawImage(heroImage, frame * 32, row * 32, 32, 32, -24, -24, 48, 48);
-      ctx.restore();
-      ctx.imageSmoothingEnabled = true;
     }
   }
 
@@ -947,42 +1002,59 @@ export function createWorld(
     ctx.restore();
   }
 
-  function render(now = performance.now()) {
+  // Two procedural Phaser layers preserve occlusion around the animated Sprite.
+  // Scenery is sorted when it changes, not allocated/sorted on every frame.
+  function renderLayer(foreground) {
     if (destroyed) return;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(backdrop, 0, 0);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const now = clock;
+    const position = heroPosition(now);
+    const depth = position.x + position.y;
     const motionTime = reducedMotion.matches ? 0 : now;
-    for (let i = 0; i < 15; i += 1) {
-      const sx = noise(i, 17) * width;
-      const sy = noise(i, 19) * height;
-      const alpha = 0.12 + (Math.sin(motionTime / 1600 + i * 2) + 1) * 0.08;
-      ctx.fillStyle = `rgba(193, 225, 204, ${alpha})`;
-      ctx.fillRect(sx, sy, i % 3 === 0 ? 7 : 3, 1);
-      if (i % 3 === 0) ctx.fillRect(sx + 3, sy - 2, 1, 5);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (!foreground) ctx.drawImage(backdrop, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!foreground) {
+      for (let i = 0; i < 15; i += 1) {
+        const sx = noise(i, 17) * width;
+        const sy = noise(i, 19) * height;
+        const alpha = 0.12 + (Math.sin(motionTime / 1600 + i * 2) + 1) * 0.08;
+        ctx.fillStyle = `rgba(193, 225, 204, ${alpha})`;
+        ctx.fillRect(sx, sy, i % 3 === 0 ? 7 : 3, 1);
+        if (i % 3 === 0) ctx.fillRect(sx + 3, sy - 2, 1, 5);
+      }
     }
     ctx.save();
     worldTransform(ctx);
-    if (destination && exploring) {
-      const point = project(destination.x, destination.y);
-      ctx.lineWidth = 1.5 / camera.scale;
-      diamond(ctx, point.x, point.y, 17, 8, "#f6eab023", "#f2e0a799");
-    }
-    const position = heroPosition(now);
-    const depth = position.x + position.y;
-    let heroDrawn = false;
-    const objects = placedProps.length
-      ? [
-          ...scenery.filter((o) => !propTiles.has(keyOf(o.x, o.y)) && !onStage(o)),
-          ...placedProps,
-        ].sort((a, b) => a.x + a.y - b.x - b.y || a.x - b.x)
-      : scenery;
-    for (const object of objects) {
-      if (!heroDrawn && object.x + object.y > depth) {
-        drawHero(position, now);
-        heroDrawn = true;
+    if (!foreground && exploring) {
+      for (const tile of route) {
+        const point = project(tile.x, tile.y);
+        diamond(ctx, point.x, point.y, 4, 2, "#f6eab0aa");
       }
+      if (destination) {
+        const point = project(destination.x, destination.y);
+        ctx.lineWidth = 1.5 / camera.scale;
+        diamond(ctx, point.x, point.y, 17, 8, "#f6eab023", "#f2e0a799");
+      }
+      const highlighted =
+        blockedTile && now < blockedTile.until ? blockedTile : hoverTile;
+      if (highlighted) {
+        const point = project(highlighted.x, highlighted.y);
+        const open = passable(highlighted.x, highlighted.y);
+        ctx.lineWidth = 1.5 / camera.scale;
+        diamond(
+          ctx,
+          point.x,
+          point.y,
+          23,
+          11,
+          open ? "#e5f4c02a" : "#ed937c33",
+          open ? "#e5f4c0bb" : "#ed937c",
+        );
+      }
+    }
+    for (const object of objects) {
+      if (object.x + object.y > depth !== foreground) continue;
       if (object.type === "tree") drawTree(object);
       else if (object.type === "ruin") drawRuin(object);
       else if (object.type === "flowers") drawFlowers(object);
@@ -991,8 +1063,8 @@ export function createWorld(
       else if (object.type === "prop") drawProp(object, motionTime);
       else drawCrystal(object, motionTime);
     }
-    if (!heroDrawn) drawHero(position, now);
-    if (collectionBurst && !reducedMotion.matches) {
+    if (!foreground) drawHeroShadow(position);
+    if (foreground && collectionBurst && !reducedMotion.matches) {
       const elapsed = (now - collectionBurst.start) / 700;
       if (elapsed >= 1) collectionBurst = null;
       else {
@@ -1014,15 +1086,44 @@ export function createWorld(
       }
     }
     ctx.restore();
-    const drift = Math.sin(motionTime / 9000) * 7;
-    drawCloud(width * 0.84 + drift, height * 0.19, 0.65, 0.055);
-    drawCloud(width * 0.09 - drift, height * 0.69, 0.6, 0.055);
-    drawCloud(width * 0.86 - drift, height * 0.84, 0.82, 0.04);
+    if (foreground) {
+      const drift = Math.sin(motionTime / 9000) * 7;
+      drawCloud(width * 0.84 + drift, height * 0.19, 0.65, 0.055);
+      drawCloud(width * 0.09 - drift, height * 0.69, 0.6, 0.055);
+      drawCloud(width * 0.86 - drift, height * 0.84, 0.82, 0.04);
+    }
+    ctx.restore();
   }
 
-  function requestFrame() {
-    if (!destroyed && !animationId && !document.hidden)
-      animationId = requestAnimationFrame(tick);
+  function render() {
+    if (!heroSprite || destroyed) return;
+    const position = heroPosition(clock);
+    const point = project(position.x, position.y);
+    heroSprite
+      .setPosition(
+        (camera.x + point.x * camera.scale) * dpr,
+        (camera.y + (point.y + 4) * camera.scale) * dpr,
+      )
+      .setScale(camera.scale * dpr * 1.5)
+      .setFlipX(hero.facing === 3);
+    const direction =
+      hero.facing === 1
+        ? "back"
+        : hero.facing === 2 || hero.facing === 3
+          ? "side"
+          : "front";
+    const action = step
+      ? "walk"
+      : clock < celebratingUntil
+        ? "collect"
+        : "idle";
+    if (reducedMotion.matches) {
+      heroSprite.anims.stop();
+      heroSprite.setFrame({ front: 12, back: 16, side: 20 }[direction]);
+    } else {
+      heroSprite.play(`${action}-${direction}`, true);
+      heroSprite.anims.timeScale = step ? STEP_TIME / step.duration : 1;
+    }
   }
 
   function reachCurrentTile(collectReward) {
@@ -1035,7 +1136,11 @@ export function createWorld(
         )
           continue;
         pendingCollections.add(reward.index);
-        collectionBurst = { x: hero.x, y: hero.y, start: performance.now() };
+        collectionBurst = { x: hero.x, y: hero.y, start: clock };
+        celebratingUntil = clock + 650;
+        onStatus(
+          "Crystal collected! Explore further, or return to coding for the next quest.",
+        );
         onCollect(reward.index);
       }
     }
@@ -1060,25 +1165,34 @@ export function createWorld(
     else if (next.x > hero.x) hero.facing = 2;
     else if (next.x < hero.x) hero.facing = 3;
     else hero.facing = 0;
-    step = { from: { x: hero.x, y: hero.y }, to: next, start: now };
+    step = {
+      from: { x: hero.x, y: hero.y },
+      to: next,
+      start: now,
+      duration: sprinting ? SPRINT_TIME : STEP_TIME,
+    };
   }
 
-  function tick(now) {
-    animationId = 0;
+  function tick(_time, delta) {
     if (destroyed || document.hidden) return;
-    if (step && now - step.start >= STEP_TIME) {
+    clock += Math.min(delta, 64);
+    if (step && clock - step.start >= step.duration) {
       hero.x = step.to.x;
       hero.y = step.to.y;
       step = null;
-      if (!route.length) destination = null;
+      if (!route.length) {
+        destination = null;
+        onStatus(EXPLORE_TIP);
+      }
       reachCurrentTile(true);
     }
-    beginStep(now);
-    if (now - lastFrame >= 32 || reducedMotion.matches) {
-      render(now);
-      lastFrame = now;
+    if (exploring && !step && heldDirections.size) {
+      let direction;
+      for (const held of heldDirections.values()) direction = held;
+      move(direction);
     }
-    if (!reducedMotion.matches || step || route.length) requestFrame();
+    beginStep(clock);
+    render();
   }
 
   function findRoute(targetX, targetY) {
@@ -1113,14 +1227,56 @@ export function createWorld(
 
   function navigate(x, y) {
     const nextRoute = findRoute(x, y);
-    if (nextRoute === null) return false;
+    if (nextRoute === null) {
+      reportBlocked(x, y);
+      return false;
+    }
     route = nextRoute;
     destination = route.length ? { x, y } : null;
     if (!route.length && !step) reachCurrentTile(true);
-    beginStep(performance.now());
-    requestFrame();
+    if (route.length)
+      onStatus(
+        `Walking ${route.length} tiles · Hold Shift to sprint · Esc to stop`,
+      );
+    beginStep(clock);
     render();
     return true;
+  }
+
+  function reportBlocked(x, y) {
+    if (
+      blockedTile?.x === x &&
+      blockedTile?.y === y &&
+      clock < blockedTile.until
+    )
+      return;
+    blockedTile = { x, y, until: clock + 450 };
+    const tile = tiles.get(keyOf(x, y));
+    onStatus(
+      !tile
+        ? "The sea is too deep. Stay on the island."
+        : tile.stage > frontier
+          ? "This path is asleep. Complete the current quest to open it."
+          : "Something blocks this path. Click another tile to walk around it.",
+    );
+  }
+
+  function setDirection(direction, pressed) {
+    if (DIRECTIONS[direction])
+      setHeldDirection(`button:${direction}`, direction, pressed);
+  }
+
+  function setHeldDirection(key, direction, pressed) {
+    if (!pressed) {
+      heldDirections.delete(key);
+      return;
+    }
+    if (!exploring || heldDirections.has(key)) return;
+    heldDirections.set(key, direction);
+    route = [];
+    destination = null;
+    onStatus(EXPLORE_TIP);
+    if (!step) move(direction);
   }
 
   function move(direction) {
@@ -1132,12 +1288,16 @@ export function createWorld(
     route = [];
     if (!passable(x, y)) {
       destination = null;
+      reportBlocked(x, y);
       return false;
+    }
+    if (blockedTile) {
+      blockedTile = null;
+      onStatus(EXPLORE_TIP);
     }
     route = [{ x, y }];
     destination = { x, y };
-    beginStep(performance.now());
-    requestFrame();
+    beginStep(clock);
     return true;
   }
 
@@ -1150,16 +1310,41 @@ export function createWorld(
       event.ctrlKey
     )
       return;
+    if (event.key === "Shift") {
+      sprinting = true;
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      clearInput();
+      onStatus("Route stopped. " + EXPLORE_TIP);
+      return;
+    }
     const direction =
       KEY_DIRECTIONS[event.key] || KEY_DIRECTIONS[event.key.toLowerCase()];
     if (!direction) return;
     event.preventDefault();
-    move(direction);
+    sprinting = event.shiftKey;
+    setHeldDirection(event.code, direction, true);
+  }
+
+  function onKeyUp(event) {
+    if (event.key === "Shift") sprinting = false;
+    heldDirections.delete(event.code);
+  }
+
+  function clearInput() {
+    heldDirections.clear();
+    sprinting = false;
+    route = [];
+    destination = null;
+    hoverTile = null;
   }
 
   function onPointerDown(event) {
     if (!exploring || event.button !== 0) return;
     canvas.focus({ preventScroll: true });
+    heldDirections.clear();
     const bounds = canvas.getBoundingClientRect();
     const localX = ((event.clientX - bounds.left) * width) / bounds.width;
     const localY = ((event.clientY - bounds.top) * height) / bounds.height;
@@ -1178,6 +1363,7 @@ export function createWorld(
       const point = project(tx, ty);
       if (Math.hypot(x - point.x, y - point.y + 46) < 16) {
         if (unlocked(index)) navigate(tx, ty);
+        else reportBlocked(tx, ty);
         return;
       }
     }
@@ -1186,14 +1372,39 @@ export function createWorld(
     navigate(tileX, tileY);
   }
 
+  function onPointerMove(event) {
+    if (!exploring || event.pointerType === "touch") return;
+    const bounds = canvas.getBoundingClientRect();
+    const x =
+      (((event.clientX - bounds.left) * width) / bounds.width - camera.x) /
+      camera.scale;
+    const y =
+      (((event.clientY - bounds.top) * height) / bounds.height - camera.y) /
+      camera.scale;
+    hoverTile = {
+      x: Math.round((x / HALF_WIDTH + y / HALF_HEIGHT) / 2),
+      y: Math.round((y / HALF_HEIGHT - x / HALF_WIDTH) / 2),
+    };
+  }
+
+  const onPointerLeave = () => {
+    hoverTile = null;
+  };
+
   function resize() {
     if (destroyed) return;
-    const bounds = canvas.getBoundingClientRect();
+    const bounds = canvas.parentElement.getBoundingClientRect();
     width = Math.max(1, bounds.width);
     height = Math.max(1, bounds.height);
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(width * dpr);
-    canvas.height = Math.round(height * dpr);
+    if (scene)
+      game.scale.resize(Math.round(width * dpr), Math.round(height * dpr));
+    else {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+    }
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
     const topMargin = width < 430 ? 70 : 74;
     const bottomMargin = width < 430 ? 49 : 47;
     const minX = -274;
@@ -1233,7 +1444,6 @@ export function createWorld(
     }
     paintBackdrop();
     render();
-    requestFrame();
   }
 
   function setProgress({
@@ -1278,12 +1488,14 @@ export function createWorld(
     hero.y = y;
     reachCurrentTile(false);
     render();
-    requestFrame();
     return true;
   }
 
   function setExploring(value) {
     exploring = Boolean(value);
+    clearInput();
+    placeProps();
+    onStatus(EXPLORE_TIP);
     canvas.style.cursor = exploring ? "crosshair" : "default";
     if (!exploring) {
       route = [];
@@ -1299,43 +1511,90 @@ export function createWorld(
   };
   const onBlur = () => {
     focused = false;
-    route = [];
-    destination = null;
+    clearInput();
     render();
   };
   const onMotionChange = () => {
     render();
-    requestFrame();
   };
   const onVisibilityChange = () => {
-    if (document.hidden) {
-      cancelAnimationFrame(animationId);
-      animationId = 0;
-    } else {
-      if (step) step.start = performance.now();
-      requestFrame();
-    }
+    if (document.hidden) clearInput();
   };
-  const onImageLoad = () => {
-    if (!destroyed) {
-      render();
-      requestFrame();
-    }
-  };
-  heroImage.addEventListener("load", onImageLoad);
-  terrainImage.addEventListener("load", onImageLoad);
-  heroImage.src = HERO_URL;
   terrainImage.src = TERRAIN_URL;
   canvas.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", clearInput);
   canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerleave", onPointerLeave);
   canvas.addEventListener("focus", onFocus);
   canvas.addEventListener("blur", onBlur);
   reducedMotion.addEventListener("change", onMotionChange);
   document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("resize", resize);
   const resizeObserver = new ResizeObserver(resize);
-  resizeObserver.observe(canvas);
+  resizeObserver.observe(canvas.parentElement);
   resize();
+
+  game = new Phaser.Game({
+    type: Phaser.CANVAS,
+    canvas,
+    parent: null,
+    width: canvas.width,
+    height: canvas.height,
+    pixelArt: true,
+    banner: false,
+    audio: { noAudio: true },
+    input: { keyboard: false, mouse: false, touch: false },
+    scale: { mode: Phaser.Scale.NONE, autoRound: true, expandParent: false },
+    scene: {
+      key: "island",
+      preload() {
+        this.load.spritesheet("hero", HERO_URL, {
+          frameWidth: 32,
+          frameHeight: 32,
+          endFrame: 35,
+        });
+      },
+      create() {
+        if (destroyed) return;
+        scene = this;
+        // Each action uses three rows: front, back, and a mirrored side view.
+        for (const [action, firstRow, frameRate] of [
+          ["walk", 0, 10],
+          ["idle", 3, 4],
+          ["collect", 6, 9],
+        ]) {
+          ["front", "back", "side"].forEach((direction, offset) => {
+            const start = (firstRow + offset) * 4;
+            this.anims.create({
+              key: `${action}-${direction}`,
+              frames: this.anims.generateFrameNumbers("hero", {
+                start,
+                end: start + 3,
+              }),
+              frameRate,
+              repeat: -1,
+            });
+          });
+        }
+        const addLayer = (foreground) => {
+          const layer = new Phaser.GameObjects.GameObject(this, "IslandArt");
+          layer.renderCanvas = () => renderLayer(foreground);
+          this.add.existing(layer);
+        };
+        addLayer(false);
+        heroSprite = this.add
+          .sprite(0, 0, "hero", 12)
+          .setOrigin(0.5, 1)
+          .setName("hero");
+        addLayer(true);
+        resize();
+        render();
+      },
+      update: tick,
+    },
+  });
 
   return {
     setProgress,
@@ -1343,22 +1602,26 @@ export function createWorld(
     travelTo,
     setExploring,
     move,
+    setDirection,
     focus() {
       if (!destroyed) canvas.focus({ preventScroll: true });
     },
     destroy() {
       destroyed = true;
-      cancelAnimationFrame(animationId);
+      clearInput();
+      game.destroy(false);
       resizeObserver.disconnect();
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clearInput);
       canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("focus", onFocus);
       canvas.removeEventListener("blur", onBlur);
       reducedMotion.removeEventListener("change", onMotionChange);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      heroImage.removeEventListener("load", onImageLoad);
-      terrainImage.removeEventListener("load", onImageLoad);
       if (originalTabIndex === null) canvas.removeAttribute("tabindex");
       else canvas.setAttribute("tabindex", originalTabIndex);
       if (originalLabel === null) canvas.removeAttribute("aria-label");
