@@ -248,16 +248,24 @@ function renderTests() {
   $("test-section").hidden = !currentResult;
   $("run-error").hidden = !currentResult?.error;
   $("run-error").textContent = currentResult?.error || "";
-  const complete = state.completed.includes(state.active);
-  $("continue-button").hidden = !complete;
+  // FreeCodeCamp style: Next quest unlocks only after the tests just passed for this attempt.
+  const complete =
+    state.completed.includes(state.active) &&
+    !!currentResult &&
+    !currentResult.error &&
+    currentResult.tests.length > 0 &&
+    currentResult.tests.every((test) => test.passed);
+  $("continue-button").disabled = !complete;
+  $("continue-button").title = complete
+    ? ""
+    : "Complete the quest: write your code, run the spell, pass every check.";
   // Once a quest is done, moving on becomes the primary action.
   document
     .querySelector(".run-section")
     .classList.toggle("complete", complete);
-  $("continue-button").innerHTML =
-    state.active === lessons.length - 1
-      ? "See your adventure <span>→</span>"
-      : "Next quest <span>→</span>";
+  $("continue-button").innerHTML = complete
+    ? `${state.active === lessons.length - 1 ? "See your adventure" : "Next quest"} <span>→</span>`
+    : `<span class="lock-icon" aria-hidden="true">🔒</span> Next quest <span>→</span>`;
 }
 function setScene(lesson, html, animate = false) {
   // DOMParser never runs scripts; the arena reads only text, inline styles, classes, and attributes.
@@ -360,7 +368,7 @@ async function execute() {
   $("reset-code").disabled = true;
   $("run-label").textContent = "Casting…";
   setHud("playing", "Casting…", "Your spell is running against the battlefield.");
-  $("continue-button").hidden = true;
+  $("continue-button").disabled = true;
   renderProgress();
   try {
     const { runExercise } = await import("./runner.js");
@@ -545,10 +553,10 @@ function confirmReset() {
 }
 $("run-button").onclick = execute;
 $("continue-button").onclick = () => {
-  if (!running)
-    state.active === lessons.length - 1
-      ? showCompletion()
-      : selectLesson(state.active + 1);
+  if (running || $("continue-button").disabled) return;
+  state.active === lessons.length - 1
+    ? showCompletion()
+    : selectLesson(state.active + 1);
 };
 $("map-button").onclick = showMap;
 $("guide-button").onclick = showGuide;

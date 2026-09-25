@@ -596,6 +596,16 @@ a {
   font: 500 16px var(--mono);
   color: var(--cyan);
 }
+/* Locked until the quest is solved. */
+.continue-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.continue-button .lock-icon {
+  font-size: 13px;
+  margin-right: 2px;
+}
 /* Once a quest is done, moving on becomes the primary action. */
 .run-section.complete .continue-button {
   order: -1;
