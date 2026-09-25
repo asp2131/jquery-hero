@@ -30,376 +30,468 @@ const test = (label, assertions, options = {}) => ({
   ...options,
 });
 
-// scene: [selector, prop kind, lit?] — how each element appears in the game panel.
+// Every quest is a battle on the same arena (see arena.js).
+// scene: [selector, kind, spawn points [x, y, level?], on?] — the Nth match of a
+// selector stands on its Nth spawn point. `on` marks the state the spell is after
+// (a goblin hit, the hero charged, the gate open). The hero stands at 2,4 unless
+// the lesson places #hero; the villager's lookout block is -1,4,1.
+const VILLAGER = [[-1, 4, 1]];
 export const lessons = [
   {
     id: 0,
-    title: "Wake the beacon",
-    chapter: "First light",
+    title: "Wake the hero",
+    chapter: "Goblin encounter",
     concept: "Libraries, ID selectors & .text()",
     description:
-      "The island beacon has been asleep for years. Send it a small, very specific wake-up call. Leave the camp sign exactly where it is.",
+      "Goblins are coming and the hero is still asleep. Change the hero's text to wake them up. Leave the villager alone.",
     objectives: [
-      "Change the text of #beacon from Sleeping to Awake.",
-      "Keep the text of #sign as Camp.",
+      "Change the text of #hero from Sleeping to Ready.",
+      "Keep #villager reading Help.",
     ],
+    steps: [
+      'Find the starter line $("#hero"). The # selects the element with id="hero".',
+      'Put the quoted string "Ready" inside .text().',
+      'Run spell. The hero should say "Ready"; the villager still says "Help".',
+    ],
+    syntax: '$("#element-id").text("New text");',
     explanation:
-      'A library is a collection of reusable code. jQuery is a JavaScript library for working with HTML, styles, and events. A normal website must import it before using it; this workshop already loads real jQuery for you. $ is the jQuery function. $("#beacon") selects the element with id="beacon", and .text("Awake") replaces its text. Put your JavaScript here, without script tags.',
+      'A library is a collection of reusable code. jQuery is a JavaScript library for working with HTML, styles, and events. A normal website must import it before using it; this workshop already loads real jQuery for you. $ is the jQuery function. $("#hero") selects the element with id="hero", and .text("Ready") replaces its text. Every character in the arena is an element in index.html; the cyan tag under it is its selector.',
     starter:
-      '// The beacon says "Sleeping" right now (peek at the index.html tab).\n// Select it and give it a new message.\n$("#beacon").text( );',
-    html: '<section><h2 id="beacon">Sleeping</h2><p id="sign">Camp</p></section>',
-    scene: [["#beacon", "beacon", (el) => el.textContent === "Awake"], ["#sign", "sign"]],
-    hints: [
-      "An ID selector starts with #. Use #beacon, not beacon.",
-      "A word passed to .text() must be a quoted string.",
-      'Try $("#beacon").text("Awake");',
+      '// Wake the hero: put "Ready" in quotes inside .text().\n$("#hero").text( );',
+    html: '<section id="battle"><p id="hero">Sleeping</p><p id="villager">Help</p><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
+    scene: [
+      ["#hero", "hero", [[2, 4]], (el) => el.textContent === "Ready"],
+      ["#villager", "villager", VILLAGER],
+      [".goblin", "goblin", [[5, 1], [6, 3]]],
     ],
-    solution: '$("#beacon").text("Awake");',
-    reward: 100,
+    hints: [
+      "An ID selector starts with #. Use #hero, not hero.",
+      "A word passed to .text() must be a quoted string.",
+      'Try $("#hero").text("Ready");',
+    ],
+    solution: '$("#hero").text("Ready");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 3–9, What is a library?, jQuery Syntax, and Code Along",
     tests: [
-      test("The beacon reads Awake", [text("#beacon", "Awake")]),
-      test("The camp sign stays untouched", [
-        count("#beacon", 1),
-        text("#sign", "Camp"),
+      test("The hero reads Ready", [text("#hero", "Ready")]),
+      test("The villager is untouched", [
+        count("#hero", 1),
+        text("#villager", "Help"),
       ]),
     ],
   },
   {
     id: 1,
-    title: "Bring the grove to life",
-    chapter: "First light",
+    title: "Spot the goblins",
+    chapter: "Goblin encounter",
     concept: "Class selectors & groups",
     description:
-      "Three seedlings share the same patch of island soil. Wake the whole grove with one selection, without disturbing the ancient tree.",
+      "Three goblins are sneaking up. Mark all of them at once with one class selection, without touching the villager.",
     objectives: [
-      "Give every .seedling the text Growing.",
-      "Keep #old-tree reading Ancient oak and keep all three seedlings.",
+      "Give every .goblin the text Spotted.",
+      "Keep #villager reading Help and keep all three goblins.",
     ],
+    steps: [
+      'Keep $(".goblin") as your selection. The dot selects every element with class="goblin".',
+      'Replace the empty string in .text("") with "Spotted". One call updates all three.',
+      "Don't select every p: that would change #villager too. Run spell.",
+    ],
+    syntax: '$(".class-name").text("New text");',
     explanation:
-      'An ID names one element; a class can be shared by many. $(".seedling") finds every element with class="seedling". Calling .text() on that collection changes every matching element. A leading dot means class, while a leading # means ID.',
+      'An ID names one element; a class can be shared by many. $(".goblin") finds every element with class="goblin". Calling .text() on that collection changes every match. A leading dot means class, while a leading # means ID.',
     starter:
-      '// A dot selects a class shared by several elements.\n$(".seedling").text("");',
-    html: '<section><h2>The quiet grove</h2><p class="seedling">Dormant</p><p class="seedling">Dormant</p><p class="seedling">Dormant</p><p id="old-tree">Ancient oak</p></section>',
-    scene: [[".seedling", "tree", (el) => el.textContent === "Growing"], ["#old-tree", "tree"]],
-    hints: [
-      "Select .seedling, including the dot.",
-      'The same .text("Growing") call can update all three seedlings.',
-      "Selecting every p would also change the old tree. Narrow your selection.",
+      '// Spot every goblin: replace the empty string with "Spotted".\n$(".goblin").text("");',
+    html: '<section id="battle"><p class="goblin">Sneaking</p><p class="goblin">Sneaking</p><p class="goblin">Sneaking</p><p id="villager">Help</p></section>',
+    scene: [
+      [".goblin", "goblin", [[5, 1], [6, 3], [4, 5]], (el) => el.textContent === "Spotted"],
+      ["#villager", "villager", VILLAGER],
     ],
-    solution: '$(".seedling").text("Growing");',
-    reward: 100,
+    hints: [
+      "Select .goblin, including the dot.",
+      'The same .text("Spotted") call can update all three goblins.',
+      "Selecting every p would also change the villager. Narrow your selection.",
+    ],
+    solution: '$(".goblin").text("Spotted");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 9 and 15, selectors and jQuery: Element Access",
     tests: [
-      test("All three seedlings are growing", [
-        count(".seedling", 3),
-        text(".seedling", "Growing"),
+      test("All three goblins are spotted", [
+        count(".goblin", 3),
+        text(".goblin", "Spotted"),
       ]),
-      test("The ancient tree is protected", [text("#old-tree", "Ancient oak")]),
+      test("The villager is untouched", [text("#villager", "Help")]),
     ],
   },
   {
     id: 2,
-    title: "Color the tide pools",
-    chapter: "First light",
+    title: "Color the battle lines",
+    chapter: "Goblin encounter",
     concept: "Changing CSS properties",
     description:
-      "The tide pools have lost their color. Give the water a blue shimmer and light the coral orange, but keep the nearby sand dry.",
+      "Your slime allies need blue ground under them and the hero needs an orange glow. The goblin's tan ground stays as it is.",
     objectives: [
-      "Set background-color to blue on both .pool elements.",
-      "Set the text color of #coral to orange.",
-      "Keep the background-color of #sand tan.",
+      "Set background-color to blue on both .slime elements.",
+      "Set the text color of #hero to orange.",
+      "Keep the background-color of #goblin tan.",
     ],
+    steps: [
+      'Find the .css() call on $(".slime"). Keep "background-color" and replace "gray" with "blue".',
+      'On a new line, select $("#hero") and call .css("color", "orange"): two quoted arguments separated by a comma.',
+      "Leave #goblin alone. Run spell.",
+    ],
+    syntax: '$("#element-id").css("color", "orange");',
     explanation:
-      '.css("property", "value") changes a CSS property on the selected elements. CSS properties such as background-color are written as strings. You can use named colors like blue, orange, and tan. The browser may report those colors as rgb values; they still describe the same colors.',
+      '.css("property", "value") changes a CSS property on the selected elements. Named colors like blue, orange, and tan work; the browser may report them as rgb values. In the arena, background-color paints the ground under a character and color makes it glow.',
     starter:
-      '// Give the pools their blue water back.\n$(".pool").css("background-color", "gray");\n// Then change the coral text color.',
-    html: '<section><h2>Tide pools</h2><p class="pool" style="background-color:gray;padding:10px">North pool</p><p class="pool" style="background-color:gray;padding:10px">South pool</p><p id="coral" style="color:gray">Coral</p><p id="sand" style="background-color:tan;padding:10px">Dry sand</p></section>',
-    scene: [[".pool", "patch"], ["#coral", "flowers"], ["#sand", "patch"]],
+      '// Change the slimes\' background from gray to blue.\n$(".slime").css("background-color", "gray");\n// Add a line selecting #hero and setting its color to orange.',
+    html: '<section id="battle"><p class="slime" style="background-color:gray">Slime</p><p class="slime" style="background-color:gray">Slime</p><p id="hero" style="color:gray">Hero</p><p id="goblin" style="background-color:tan">Goblin</p></section>',
+    scene: [
+      [".slime", "slime", [[1, 5], [0, 3]]],
+      ["#hero", "hero", [[2, 4]]],
+      ["#goblin", "goblin", [[5, 2]]],
+    ],
     hints: [
-      'Use .css("background-color", "blue") for the pools.',
-      "The coral needs the color property, not background-color.",
-      "Make two selections: .pool and #coral.",
+      'Use .css("background-color", "blue") for the slimes.',
+      "The hero needs the color property, not background-color.",
+      "Make two selections: .slime and #hero.",
     ],
     solution:
-      '$(".pool").css("background-color", "blue");\n$("#coral").css("color", "orange");',
-    reward: 100,
+      '$(".slime").css("background-color", "blue");\n$("#hero").css("color", "orange");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 6, 9, 24, and 26, .css() and jQuery Reference",
     tests: [
-      test("Both pools turn blue", [
-        count(".pool", 2),
-        css(".pool", "background-color", "rgb(0, 0, 255)"),
+      test("Both slimes stand on blue", [
+        count(".slime", 2),
+        css(".slime", "background-color", "rgb(0, 0, 255)"),
       ]),
-      test("The coral glows orange", [
-        css("#coral", "color", "rgb(255, 165, 0)"),
-      ]),
-      test("The sand stays dry", [
-        css("#sand", "background-color", "rgb(210, 180, 140)"),
+      test("The hero glows orange", [css("#hero", "color", "rgb(255, 165, 0)")]),
+      test("The goblin's ground stays tan", [
+        css("#goblin", "background-color", "rgb(210, 180, 140)"),
       ]),
     ],
   },
   {
     id: 3,
-    title: "Mend the mossy bridge",
-    chapter: "A living island",
+    title: "Choose your targets",
+    chapter: "Goblin ambush",
     concept: "Adding & removing classes",
-    description:
-      "The bridge is still marked broken. Remove that warning, mark it repaired, and preserve the stonework that has held it together.",
+    description: "Hit the goblins. Protect the villager.",
     objectives: [
-      "Remove the broken class from #bridge.",
-      "Add the repaired class to #bridge while keeping its stone class.",
-      "Leave the warning sign marked caution.",
+      "Remove the shielded class from every .goblin.",
+      "Add the hit class to every .goblin, keeping their goblin class.",
+      "Leave #villager with its safe class and Help text.",
     ],
+    steps: [
+      'Use the two $(".goblin") selections in quest.js.',
+      'Fill .removeClass() with "shielded" and .addClass() with "hit". No dots in class names.',
+      "Don't replace the whole class attribute: goblins must keep the goblin class. Run spell.",
+    ],
+    syntax: '$(".selector").removeClass("old-state").addClass("new-state");',
     explanation:
-      'Classes can describe state as well as appearance. .removeClass("broken") removes just that class, and .addClass("repaired") adds a new one without replacing other classes. Do not include a dot in these method arguments: the dot belongs in a selector, not in a class name.',
+      'Classes can describe state as well as appearance. .removeClass("shielded") removes just that class, and .addClass("hit") adds one without replacing the others. Don\'t include a dot in these method arguments: the dot belongs in a selector, not in a class name.',
     starter:
-      '// Change only the bridge’s state classes.\n$("#bridge").removeClass("");\n$("#bridge").addClass("");',
-    html: '<section><h2 id="bridge" class="stone broken">Mossy bridge</h2><p id="warning" class="caution">Watch your step</p></section>',
-    scene: [["#bridge", "bridge", (el) => el.matches(".repaired:not(.broken)")], ["#warning", "sign"]],
-    hints: [
-      "The selector is #bridge, and the class name is broken without a dot.",
-      "Remove broken, then add repaired.",
-      "Do not overwrite the complete class attribute: stone must survive.",
+      '// Break the shields, then mark the goblins hit.\n// Class names go in quotes, without a dot.\n$(".goblin").removeClass("");\n$(".goblin").addClass("");',
+    html: '<section id="battle"><p class="goblin shielded">Goblin</p><p class="goblin shielded">Goblin</p><p id="villager" class="safe">Help</p></section>',
+    scene: [
+      [".goblin", "goblin", [[4, 1], [5, 3]], (el) => el.matches(".hit:not(.shielded)")],
+      ["#villager", "villager", VILLAGER],
     ],
-    solution:
-      '$("#bridge").removeClass("broken");\n$("#bridge").addClass("repaired");',
-    reward: 100,
+    hints: [
+      "The selector is .goblin; the class names are shielded and hit, without dots.",
+      "Remove shielded, then add hit.",
+      "Don't overwrite the whole class attribute: goblin must survive.",
+    ],
+    solution: '$(".goblin").removeClass("shielded");\n$(".goblin").addClass("hit");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 9, 24, and 26, .addClass() and .removeClass()",
     tests: [
-      test("The bridge is repaired, not broken", [
-        hasClass("#bridge", "repaired"),
-        hasClass("#bridge", "broken", false),
+      test("Both goblins are hit, not shielded", [
+        count(".goblin", 2),
+        hasClass(".goblin", "hit"),
+        hasClass(".goblin", "shielded", false),
       ]),
-      test("The original stonework and warning remain", [
-        hasClass("#bridge", "stone"),
-        hasClass("#warning", "caution"),
-        text("#warning", "Watch your step"),
+      test("The villager is protected", [
+        hasClass("#villager", "safe"),
+        text("#villager", "Help"),
       ]),
     ],
   },
   {
     id: 4,
-    title: "Lift the harbor fog",
-    chapter: "A living island",
+    title: "Clear the smoke",
+    chapter: "Goblin ambush",
     concept: ".hide() & .show()",
     description:
-      "Fog covers the harbor and a hidden ferry waits beneath it. Clear both fog banks and reveal the boat without removing anything from the island.",
+      "Goblins threw smoke bombs to hide an ambush. Hide both smoke clouds and reveal the hidden goblin, without deleting anything.",
     objectives: [
-      "Hide both .fog elements.",
-      "Show the initially hidden #ferry.",
-      "Keep the fog elements in the DOM and keep #lighthouse visible.",
+      "Hide both .smoke elements.",
+      "Show the hidden #goblin.",
+      "Keep the smoke in the DOM and keep #hero visible.",
     ],
+    steps: [
+      'Keep $(".smoke").hide(). It hides both clouds without deleting them.',
+      'Below it, select $("#goblin") and call .show() with empty parentheses.',
+      "Don't use .remove() or .empty(). Run spell.",
+    ],
+    syntax: '$(".class-name").hide();\n$("#element-id").show();',
     explanation:
       ".hide() sets an element’s display so it disappears, but the element still exists in the document. .show() restores it. This is useful when you want to reveal or conceal something again later. Removing an element is a different operation.",
     starter:
-      '// Hide the fog, then reveal the ferry.\n$(".fog").hide();\n// Your ferry selection goes here.',
-    html: '<section><h2 id="lighthouse">Harbor light</h2><p class="fog">Fog over the water</p><p class="fog">Fog over the pier</p><p id="ferry" style="display:none">The ferry is ready</p></section>',
-    scene: [["#lighthouse", "beacon"], [".fog", "fog"], ["#ferry", "boat"]],
-    hints: [
-      "Use a class selector for the two fog banks.",
-      'Use $("#ferry").show() to reveal the boat.',
-      "Do not use .remove() or .empty(): the fog must still exist.",
+      '// Hide both smoke clouds without deleting them.\n$(".smoke").hide();\n// Add a line selecting #goblin and calling .show().',
+    html: '<section id="battle"><p id="hero">Hero</p><p class="smoke">Smoke</p><p class="smoke">Smoke</p><p id="goblin" style="display:none">Ambush!</p></section>',
+    scene: [
+      ["#hero", "hero", [[2, 4]]],
+      [".smoke", "smoke", [[4, 2], [5, 4]]],
+      ["#goblin", "goblin", [[5, 3]]],
     ],
-    solution: '$(".fog").hide();\n$("#ferry").show();',
-    reward: 100,
+    hints: [
+      "Use a class selector for the two smoke clouds.",
+      'Use $("#goblin").show() to reveal the ambush.',
+      "Don't use .remove() or .empty(): the smoke must still exist.",
+    ],
+    solution: '$(".smoke").hide();\n$("#goblin").show();',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 5, 13, and 15, .hide(), .show(), and Element Access",
     tests: [
-      test("Both fog banks are hidden, not deleted", [
-        count(".fog", 2),
-        visible(".fog", false),
+      test("Both smoke clouds are hidden, not deleted", [
+        count(".smoke", 2),
+        visible(".smoke", false),
       ]),
-      test("The ferry and harbor light are visible", [
-        visible("#ferry", true),
-        visible("#lighthouse", true),
-        text("#ferry", "The ferry is ready"),
+      test("The ambush is revealed and the hero is visible", [
+        visible("#goblin", true),
+        visible("#hero", true),
+        text("#goblin", "Ambush!"),
       ]),
     ],
   },
   {
     id: 5,
-    title: "Plant a crystal marker",
-    chapter: "A living island",
+    title: "Summon an ally",
+    chapter: "Goblin ambush",
     concept: "Creating, appending & attributes",
     description:
-      "The trail needs a marker pointing toward the crystal cove. Build a new sign inside the trail container and keep the welcome sign beside it.",
+      "The villager needs backup. Create a slime ally inside #party and put it on the hero's team.",
     objectives: [
-      "Create exactly one p element with id crystal-marker inside #trail.",
-      'Give it the text Crystal Cove and the attribute data-direction="east".',
-      "Preserve the existing #welcome sign.",
+      "Create exactly one p element with id slime inside #party.",
+      'Give it the text Ally and the attribute data-team="hero".',
+      "Keep #villager in the party.",
     ],
+    steps: [
+      'Keep the line that creates $ally with $("<p>"). Angle brackets create a new paragraph.',
+      'Call .attr("id", "slime") and .attr("data-team", "hero") on $ally, then .text("Ally").',
+      'Finish with $ally.appendTo("#party") so it joins the battle. Run spell.',
+    ],
+    syntax:
+      'const $item = $("<p>");\n$item.attr("id", "new-item").text("A label").appendTo("#container");',
     explanation:
-      '$("p") selects existing paragraphs; $("<p>") creates a new paragraph. A new element is not visible until it is inserted into the document. .attr("id", "crystal-marker") sets an attribute, .text() sets its words, and .appendTo("#trail") places it inside the trail container.',
+      '$("p") selects existing paragraphs; $("<p>") creates a new one. A new element isn\'t on the page until you insert it. .attr("id", "slime") sets an attribute, .text() sets its words, and .appendTo("#party") places it inside the party.',
     starter:
-      '// Angle brackets create a new element.\nconst $marker = $("<p>");\n// Set its id, text, and data-direction, then append it to #trail.',
-    html: '<section><h2>Trailhead</h2><div id="trail"><p id="welcome">Welcome, explorer</p></div></section>',
-    scene: [["#welcome", "sign"], ["#crystal-marker", "crystal"]],
+      'const $ally = $("<p>");\n// Use .attr() for id=slime and data-team=hero.\n// Use .text() for Ally, then .appendTo() to add it to #party.',
+    html: '<section id="battle"><div id="party"><p id="villager">Help</p></div><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
+    scene: [
+      ["#villager", "villager", VILLAGER],
+      ["#slime", "slime", [[1, 5]], (el) => el.dataset.team === "hero"],
+      [".goblin", "goblin", [[5, 1], [6, 3]]],
+    ],
     hints: [
-      "Save the new element in $marker so you can keep working on it.",
-      "Set two attributes: id to crystal-marker and data-direction to east.",
-      'Finish with $marker.appendTo("#trail");',
+      "Save the new element in $ally so you can keep working on it.",
+      "Set two attributes: id to slime and data-team to hero.",
+      'Finish with $ally.appendTo("#party");',
     ],
     solution:
-      'const $marker = $("<p>");\n$marker.attr("id", "crystal-marker");\n$marker.attr("data-direction", "east");\n$marker.text("Crystal Cove");\n$marker.appendTo("#trail");',
-    reward: 100,
+      'const $ally = $("<p>");\n$ally.attr("id", "slime");\n$ally.attr("data-team", "hero");\n$ally.text("Ally");\n$ally.appendTo("#party");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 14, 21, 24–26, Element Creation and jQuery Reference",
     tests: [
-      test("A new paragraph marks the trail", [
-        count("#crystal-marker", 1),
-        count("#trail > p#crystal-marker", 1),
-        text("#crystal-marker", "Crystal Cove"),
+      test("A slime ally joins the party", [
+        count("#slime", 1),
+        count("#party > p#slime", 1),
+        text("#slime", "Ally"),
       ]),
-      test("The marker points east and the welcome sign survives", [
-        attribute("#crystal-marker", "data-direction", "east"),
-        text("#trail > #welcome", "Welcome, explorer"),
+      test("The slime is on the hero's team and the villager stays", [
+        attribute("#slime", "data-team", "hero"),
+        text("#party > #villager", "Help"),
       ]),
     ],
   },
   {
     id: 6,
-    title: "Rescue the last sapling",
-    chapter: "Tools of the trade",
+    title: "Rescue the villager",
+    chapter: "Goblin camp",
     concept: ".empty(), .detach() & moving nodes",
     description:
-      "A healthy sapling is trapped among the ruins. Move the original plant into the nursery before clearing the rubble. A copy is not the same living tree.",
+      "The villager is locked in a goblin cage. Move them to camp first, then clear the cage. A copy is not the same villager.",
     objectives: [
-      "Move the original #sapling from #ruins into #nursery.",
-      "Empty #ruins completely, but keep the ruins container itself.",
-      "Preserve the sapling’s healthy class and text.",
+      "Move the original #villager from #cage into #camp.",
+      "Empty #cage completely, but keep the cage itself.",
+      "Keep the villager's brave class and Help text.",
     ],
+    steps: [
+      'Add .detach() after $("#villager") in the const line. $villager keeps the original.',
+      'Next, call $("#cage").empty() to clear out the guards. Only after detaching!',
+      "Call $villager.appendTo(\"#camp\"). Don't create a new villager. Run spell.",
+    ],
+    syntax: 'const $saved = $("#item").detach();\n$saved.appendTo("#new-home");',
     explanation:
-      ".detach() takes an element out of the document while keeping the same element available to reuse. Save the result, clear the old container with .empty(), and append the saved element to its new home. .empty() removes the contents of a container, not the container itself. Detach the sapling before emptying the ruins.",
+      ".detach() takes an element out of the document but keeps the same element for reuse. Save it, clear the old container with .empty(), and append the saved element to its new home. .empty() removes a container's contents, not the container. Detach the villager before emptying the cage.",
     starter:
-      '// Rescue first; clear the ruins second.\nconst $sapling = $("#sapling");\n// Detach it, empty #ruins, and move it into #nursery.',
-    html: '<section><h2>The old ruins</h2><div id="ruins"><p class="rubble">Fallen stones</p><p id="sapling" class="healthy">Last sapling</p><p class="rubble">Broken branches</p></div><div id="nursery"></div></section>',
-    scene: [[".rubble", "ruin"], ["#nursery", "patch"], ["#sapling", "tree", (el) => el.matches(".healthy")]],
+      'const $villager = $("#villager");\n// Add .detach() above, then call .empty() on #cage.\n// Use $villager.appendTo() to move them into #camp.',
+    html: '<section id="battle"><div id="cage"><p class="goblin">Guard</p><p id="villager" class="brave">Help</p><p class="goblin">Guard</p></div><div id="camp"></div></section>',
+    scene: [
+      ["#cage > #villager", "villager", [[5, 2]]],
+      ["#villager", "villager", VILLAGER],
+      ["#cage", "jail", [[5, 2]]],
+      [".goblin", "goblin", [[3, 2], [4, 4]]],
+    ],
     hints: [
-      'Save $("#sapling").detach() in a variable before clearing its old home.',
-      '$("#ruins").empty() clears all remaining content.',
-      "Append the saved sapling into #nursery; do not create a new paragraph.",
+      'Save $("#villager").detach() in a variable before clearing the cage.',
+      '$("#cage").empty() clears everything left inside.',
+      "Append the saved villager to #camp; don't create a new paragraph.",
     ],
     solution:
-      'const $sapling = $("#sapling").detach();\n$("#ruins").empty();\n$sapling.appendTo("#nursery");',
-    reward: 100,
+      'const $villager = $("#villager").detach();\n$("#cage").empty();\n$villager.appendTo("#camp");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 9, 23, and 26, cached jQueries, .empty(), and .detach()",
     tests: [
       test(
-        "The original sapling reaches the nursery",
+        "The original villager reaches camp",
         [
           {
             type: "sameNode",
-            selector: "#nursery > #sapling",
-            original: "#sapling",
+            selector: "#camp > #villager",
+            original: "#villager",
           },
-          count("#sapling", 1),
+          count("#villager", 1),
         ],
-        { remember: ["#sapling"] },
+        { remember: ["#villager"] },
       ),
-      test("The ruins are empty and the rescued tree is healthy", [
-        count("#ruins", 1),
-        count("#ruins > *", 0),
-        text("#ruins", ""),
-        hasClass("#nursery > #sapling", "healthy"),
-        text("#sapling", "Last sapling"),
+      test("The cage is empty and the villager is still brave", [
+        count("#cage", 1),
+        count("#cage > *", 0),
+        text("#cage", ""),
+        hasClass("#camp > #villager", "brave"),
+        text("#villager", "Help"),
       ]),
     ],
   },
   {
     id: 7,
-    title: "Restore the lookout",
-    chapter: "Tools of the trade",
+    title: "Power up the hero",
+    chapter: "Goblin camp",
     concept: "Chaining & cached selections",
     description:
-      "The lookout needs a whole restoration, not just a fresh coat of paint. Keep one reference to it and give it its identity, color, and purpose again.",
+      "One reference, many upgrades. Give the hero new text, a class, a color, and a title in one chain.",
     objectives: [
-      "Set #lookout text to Ready and add its restored class.",
-      "Set its text color to limegreen and title attribute to Northern lookout.",
-      "Keep the lookout’s tower class and leave the dock untouched.",
+      "Set #hero text to Ready and add the charged class.",
+      "Set its color to limegreen and its title to Goblin slayer.",
+      "Keep the hero class and leave #villager untouched.",
     ],
+    steps: [
+      'Keep const $hero = $("#hero"); and the .text("Ready") call.',
+      'Chain .addClass("charged"), .css("color", "limegreen"), and .attr("title", "Goblin slayer"). Move the semicolon to the very end.',
+      "Leave #villager alone. Run spell.",
+    ],
+    syntax: 'const $item = $("#element-id");\n$item.text("Updated").addClass("active");',
     explanation:
-      'Most jQuery setters return the selected collection, so you can chain them: $tower.text("Ready").addClass("restored"). Save a selection in a variable to avoid looking up the same element repeatedly. The $ at the start of $tower is a naming convention, not special JavaScript syntax. The checks care about the restored world, not whether you choose a chain or separate statements.',
+      'Most jQuery setters return the selection, so you can chain them: $hero.text("Ready").addClass("charged"). Saving a selection in a variable avoids looking it up again. The $ in $hero is a naming convention, not special syntax. The checks care about the result, not whether you chain or write separate lines.',
     starter:
-      '// Cache the selection, then build a chain of changes.\nconst $tower = $("#lookout");\n$tower.text("Ready");',
-    html: '<section><h2 id="lookout" class="tower" title="Abandoned" style="color:gray">Silent</h2><p id="dock" title="South landing">Dock</p></section>',
-    scene: [["#lookout", "beacon", (el) => el.matches(".restored")], ["#dock", "sign"]],
+      'const $hero = $("#hero");\n$hero.text("Ready");\n// Chain .addClass("charged"), .css() for limegreen,\n// and .attr() for the title Goblin slayer.',
+    html: '<section id="battle"><p id="hero" class="hero" title="Rookie" style="color:gray">Tired</p><p id="villager" title="Farmer">Help</p><p class="goblin">Goblin</p><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
+    scene: [
+      ["#hero", "hero", [[2, 4]], (el) => el.matches(".charged")],
+      ["#villager", "villager", VILLAGER],
+      [".goblin", "goblin", [[5, 1], [6, 3], [5, 5]]],
+    ],
     hints: [
-      'Continue the chain with .addClass("restored").',
-      'Use .css("color", "limegreen") and .attr("title", "Northern lookout").',
+      'Continue the chain with .addClass("charged").',
+      'Use .css("color", "limegreen") and .attr("title", "Goblin slayer").',
       "Put the semicolon at the end of a chain, not between its methods.",
     ],
     solution:
-      'const $tower = $("#lookout");\n$tower\n  .text("Ready")\n  .addClass("restored")\n  .css("color", "limegreen")\n  .attr("title", "Northern lookout");',
-    reward: 100,
+      'const $hero = $("#hero");\n$hero\n  .text("Ready")\n  .addClass("charged")\n  .css("color", "limegreen")\n  .attr("title", "Goblin slayer");',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 22–24, Some jQuery Tricks: chaining, cached selections, and attributes",
     tests: [
-      test("The lookout is ready and restored", [
-        text("#lookout", "Ready"),
-        hasClass("#lookout", "restored"),
-        hasClass("#lookout", "tower"),
+      test("The hero is ready and charged", [
+        text("#hero", "Ready"),
+        hasClass("#hero", "charged"),
+        hasClass("#hero", "hero"),
       ]),
-      test("The lookout has its color and title", [
-        css("#lookout", "color", "rgb(50, 205, 50)"),
-        attribute("#lookout", "title", "Northern lookout"),
+      test("The hero glows limegreen with a new title", [
+        css("#hero", "color", "rgb(50, 205, 50)"),
+        attribute("#hero", "title", "Goblin slayer"),
       ]),
-      test("The dock keeps its identity", [
-        text("#dock", "Dock"),
-        attribute("#dock", "title", "South landing"),
+      test("The villager keeps their identity", [
+        text("#villager", "Help"),
+        attribute("#villager", "title", "Farmer"),
       ]),
     ],
   },
   {
     id: 8,
-    title: "Open the garden gate",
-    chapter: "An island that responds",
+    title: "Pull the lever",
+    chapter: "Goblin fortress",
     concept: "Click events & function references",
     description:
-      "Give the garden gate a working switch. It must stay closed until someone clicks, then alternate between open and closed on every click.",
+      "Wire the fortress lever. Nothing happens until someone clicks; then each pull toggles the gate between Closed and Open.",
     objectives: [
-      "Keep #gate reading Closed until #gate-switch is clicked.",
+      "Keep #gate reading Closed until #lever is clicked.",
       "Make each click alternate #gate between Open and Closed.",
-      "Register the function itself as the handler; do not call it while registering.",
+      "Register the function itself; don't call it while registering.",
     ],
+    steps: [
+      "Write your code inside the braces of toggleGate.",
+      'Read $("#gate").text(). If it === "Closed", set "Open"; else set "Closed".',
+      'Keep $("#lever").on("click", toggleGate); without (). Run spell: the tests pull the lever for you.',
+    ],
+    syntax:
+      'if ($("#element-id").text() === "Waiting") {\n  $("#element-id").text("Ready");\n} else {\n  $("#element-id").text("Waiting");\n}',
     explanation:
-      'An event handler is a function saved for later. .on("click", toggleGate) tells jQuery to call toggleGate when a click happens. Writing toggleGate() calls it immediately and passes its return value instead. Inside your handler, .text() with no argument reads the current text; an if/else can choose the next state.',
+      'An event handler is a function saved for later. .on("click", toggleGate) tells jQuery to call toggleGate when a click happens. Writing toggleGate() calls it immediately instead. Inside the handler, .text() with no argument reads the current text; if/else picks the next state.',
     starter:
-      'function toggleGate() {\n  // Read the gate text and choose its opposite state.\n}\n\n// Pass the function, without calling it.\n$("#gate-switch").on("click", toggleGate);',
-    html: '<section><h2>Garden gate</h2><p id="gate">Closed</p><button id="gate-switch" type="button">Toggle gate</button><p id="garden">Seeds are safe</p></section>',
-    scene: [["#gate", "gate", (el) => el.textContent === "Open"], ["#gate-switch", "sign"], ["#garden", "flowers"]],
+      'function toggleGate() {\n  // Read #gate with .text(). Closed becomes Open; otherwise set Closed.\n}\n\n// Pass the function without () so nothing changes before a click.\n$("#lever").on("click", toggleGate);',
+    html: '<section id="battle"><p id="gate">Closed</p><button id="lever" type="button">Pull lever</button><p id="villager">Safe</p></section>',
+    scene: [
+      ["#gate", "gate", [[4, 0]], (el) => el.textContent === "Open"],
+      ["#lever", "lever", [[1, 2]]],
+      ["#villager", "villager", VILLAGER],
+    ],
     hints: [
       'Read $("#gate").text() inside the function.',
       "If it equals Closed, set Open. Otherwise set Closed.",
       'Use .on("click", toggleGate), not .on("click", toggleGate()).',
     ],
     solution:
-      'function toggleGate() {\n  if ($("#gate").text() === "Closed") {\n    $("#gate").text("Open");\n  } else {\n    $("#gate").text("Closed");\n  }\n}\n\n$("#gate-switch").on("click", toggleGate);',
-    reward: 100,
+      'function toggleGate() {\n  if ($("#gate").text() === "Closed") {\n    $("#gate").text("Open");\n  } else {\n    $("#gate").text("Closed");\n  }\n}\n\n$("#lever").on("click", toggleGate);',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 5 and 16–20, jQuery Events and Event Handler Functions: No ()!",
     tests: [
       test("The gate waits for a click", [
         text("#gate", "Closed"),
-        text("#garden", "Seeds are safe"),
+        text("#villager", "Safe"),
       ]),
-      test("The first click opens the gate", [text("#gate", "Open")], {
-        steps: [click("#gate-switch")],
+      test("The first pull opens the gate", [text("#gate", "Open")], {
+        steps: [click("#lever")],
       }),
       test(
-        "Repeated clicks keep toggling",
-        [text("#gate", "Open"), text("#garden", "Seeds are safe")],
+        "Repeated pulls keep toggling",
+        [text("#gate", "Open"), text("#villager", "Safe")],
         {
           steps: [
-            click("#gate-switch"),
+            click("#lever"),
             check(text("#gate", "Open")),
-            click("#gate-switch"),
+            click("#lever"),
             check(text("#gate", "Closed")),
-            click("#gate-switch"),
+            click("#lever"),
           ],
         },
       ),
@@ -407,62 +499,72 @@ export const lessons = [
   },
   {
     id: 9,
-    title: "Consult the wishing coin",
-    chapter: "An island that responds",
+    title: "Roll to hit",
+    chapter: "Goblin fortress",
     concept: "Random branches & click handlers",
     description:
-      "The wishing well answers with a coin toss. Flip only when asked, use both sides of chance, and count every wish made at the well.",
+      "Every swing is a coin flip. Decide Hit or Miss on each click and count every swing.",
     objectives: [
-      "Leave #coin as Ready and #flip-count as 0 before the first click.",
-      "On each #flip click, show Heads if Math.random() > 0.5; otherwise show Tails.",
-      "Increase #flip-count by exactly one on every click, including repeated flips.",
+      "Leave #result as Ready and #swings as 0 before the first click.",
+      "On each #attack click, show Hit if Math.random() > 0.5; otherwise Miss.",
+      "Increase #swings by exactly one on every click.",
     ],
+    steps: [
+      "Keep let swings = 0; outside swing() so the count survives between clicks. Write inside swing().",
+      'Use if (Math.random() > 0.5) to set #result to "Hit"; else "Miss". Exactly 0.5 is a Miss.',
+      'After the if/else: swings += 1; then $("#swings").text(swings). Keep the .on("click", swing) line. Run spell.',
+    ],
+    syntax:
+      "if (Math.random() > 0.5) {\n  // The higher half of the range.\n} else {\n  // The lower half, including 0.5.\n}",
     explanation:
-      "Math.random() returns a number from 0 up to, but not including, 1. The lecture’s coin uses an if/else with a 0.5 boundary. Put the random draw inside the click handler so every click gets a new result. A number variable declared outside the handler remembers the count between clicks. The workshop supplies predictable random values during checks so both branches can be verified fairly.",
+      "Math.random() returns a number from 0 up to, but not including, 1. Draw inside the click handler so every click gets a fresh result. A variable declared outside the handler remembers the count between clicks. The checks supply predictable random values so both branches can be verified.",
     starter:
-      'let flips = 0;\n\nfunction flipCoin() {\n  // Draw a random number here, then show Heads or Tails.\n  // Increase flips and update #flip-count.\n}\n\n$("#flip").on("click", flipCoin);',
-    html: '<section><h2>Wishing well</h2><p id="coin">Ready</p><p>Wishes: <span id="flip-count">0</span></p><button id="flip" type="button">Flip a coin</button></section>',
-    scene: [["#coin", "crystal"], ["#flip-count", "sign"], ["#flip", "sign"]],
+      'let swings = 0;\n\nfunction swing() {\n  // If a fresh Math.random() is above 0.5, set #result to Hit; else Miss.\n  // Then add 1 to swings and show it in #swings.\n}\n\n$("#attack").on("click", swing);',
+    html: '<section id="battle"><p id="result">Ready</p><p>Swings: <span id="swings">0</span></p><button id="attack" type="button">Attack</button></section>',
+    scene: [
+      ["#result", "goblin", [[5, 2]], (el) => el.textContent === "Hit"],
+      ["#swings", "label", [[2, 6]]],
+    ],
     hints: [
-      "Use if (Math.random() > 0.5) inside flipCoin.",
-      "Set #coin to Heads in the if branch and Tails in the else branch.",
-      'After either branch, write flips += 1; and $("#flip-count").text(flips);',
+      "Use if (Math.random() > 0.5) inside swing.",
+      "Set #result to Hit in the if branch and Miss in the else branch.",
+      'After either branch, write swings += 1; and $("#swings").text(swings);',
     ],
     solution:
-      'let flips = 0;\n\nfunction flipCoin() {\n  if (Math.random() > 0.5) {\n    $("#coin").text("Heads");\n  } else {\n    $("#coin").text("Tails");\n  }\n  flips += 1;\n  $("#flip-count").text(flips);\n}\n\n$("#flip").on("click", flipCoin);',
-    reward: 100,
+      'let swings = 0;\n\nfunction swing() {\n  if (Math.random() > 0.5) {\n    $("#result").text("Hit");\n  } else {\n    $("#result").text("Miss");\n  }\n  swings += 1;\n  $("#swings").text(swings);\n}\n\n$("#attack").on("click", swing);',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 10–11 and 18–20, coin flip challenge and event handler references",
     tests: [
-      test("No coin is flipped before a click", [
-        text("#coin", "Ready"),
-        text("#flip-count", "0"),
+      test("Nothing happens before a click", [
+        text("#result", "Ready"),
+        text("#swings", "0"),
       ]),
       test(
-        "A high draw produces Heads",
-        [text("#coin", "Heads"), text("#flip-count", "1")],
-        { random: [0.9], steps: [click("#flip")] },
+        "A high draw is a Hit",
+        [text("#result", "Hit"), text("#swings", "1")],
+        { random: [0.9], steps: [click("#attack")] },
       ),
       test(
-        "A low draw produces Tails",
-        [text("#coin", "Tails"), text("#flip-count", "1")],
-        { random: [0.1], steps: [click("#flip")] },
+        "A low draw is a Miss",
+        [text("#result", "Miss"), text("#swings", "1")],
+        { random: [0.1], steps: [click("#attack")] },
       ),
-      test("Exactly 0.5 belongs to Tails", [text("#coin", "Tails")], {
+      test("Exactly 0.5 is a Miss", [text("#result", "Miss")], {
         random: [0.5],
-        steps: [click("#flip")],
+        steps: [click("#attack")],
       }),
       test(
         "Every click draws again and is counted",
-        [text("#coin", "Heads"), text("#flip-count", "3")],
+        [text("#result", "Hit"), text("#swings", "3")],
         {
           random: [0.9, 0.1, 0.8],
           steps: [
-            click("#flip"),
-            check(text("#coin", "Heads"), text("#flip-count", "1")),
-            click("#flip"),
-            check(text("#coin", "Tails"), text("#flip-count", "2")),
-            click("#flip"),
+            click("#attack"),
+            check(text("#result", "Hit"), text("#swings", "1")),
+            click("#attack"),
+            check(text("#result", "Miss"), text("#swings", "2")),
+            click("#attack"),
           ],
         },
       ),
@@ -470,81 +572,87 @@ export const lessons = [
   },
   {
     id: 10,
-    title: "Name your voyage",
-    chapter: "An island that responds",
+    title: "Name your hero",
+    chapter: "Goblin fortress",
     concept: "Keyboard & change events",
     description:
-      "A restored island deserves a named ship. Keep the painted name in sync with typing and let the crew choose a sail color from the rigging controls.",
+      "Type a name and pick an aura color. The hero updates on every keyup and every change.",
     objectives: [
-      "On keyup in #ship-name, copy its current value into #name-preview.",
-      "On change of #sail-color, set #sail text color to the selected value.",
-      "Respond to repeated events; do not update the preview before the corresponding event.",
+      "On keyup in #hero-name, copy its value into #hero.",
+      "On change of #aura, set the color of #hero to the selected value.",
+      "Update only when the event arrives, every time it arrives.",
     ],
+    steps: [
+      'Inside paintName, pass $("#hero-name").val() to $("#hero").text(), even when it is empty.',
+      'Inside paintAura, call .css("color", $("#aura").val()) on #hero. Don\'t hard-code a color.',
+      "Keep both .on() lines outside the functions, without (). Run spell: the tests type and pick colors for you.",
+    ],
+    syntax: 'const currentValue = $("#input-id").val();\n$("#preview-id").text(currentValue);',
     explanation:
-      'Events are not limited to clicks. keyup fires when a key is released; change reports a committed form selection. .val() reads an input or select value, while .text() updates ordinary visible text. Read the value inside the handler so it is fresh for every event. .on("keyup", handler) and .on("change", handler) use the same function-reference pattern as click.',
+      'Events aren\'t only clicks. keyup fires when a key is released; change reports a committed form choice. .val() reads an input or select value, while .text() updates visible text. Read the value inside the handler so it is fresh every time. .on("keyup", handler) and .on("change", handler) follow the same function-reference pattern as click.',
     starter:
-      'function paintName() {\n  // Read #ship-name with .val(), then update #name-preview.\n}\n\nfunction paintSail() {\n  // Read #sail-color, then change the color of #sail.\n}\n\n$("#ship-name").on("keyup", paintName);\n$("#sail-color").on("change", paintSail);',
-    html: '<section><h2>Shipwright’s dock</h2><label>Ship name <input id="ship-name" value="Seabird"></label><p id="name-preview">Seabird</p><label>Sail color <select id="sail-color"><option value="blue">Blue</option><option value="green">Green</option><option value="gold">Gold</option></select></label><p id="sail" style="color:blue">Set sail</p></section>',
-    scene: [["#name-preview", "sign"], ["#sail", "boat"]],
+      'function paintName() {\n  // Read #hero-name with .val() and copy it into #hero with .text().\n}\n\nfunction paintAura() {\n  // Read #aura with .val() and use .css() to set #hero\'s color.\n}\n\n$("#hero-name").on("keyup", paintName);\n$("#aura").on("change", paintAura);',
+    html: '<section id="battle"><label>Hero name <input id="hero-name" value="Sparky"></label><label>Aura <select id="aura"><option value="blue">Blue</option><option value="green">Green</option><option value="gold">Gold</option></select></label><p id="hero" style="color:blue">Sparky</p><p class="goblin">Goblin</p></section>',
+    scene: [
+      ["#hero", "hero", [[2, 4]]],
+      [".goblin", "goblin", [[5, 2]]],
+    ],
     hints: [
-      'Inside paintName, use $("#name-preview").text($("#ship-name").val());',
-      'Inside paintSail, use .css("color", $("#sail-color").val()).',
-      "Keep both .on() calls outside the handler functions so each is registered only once.",
+      'Inside paintName, use $("#hero").text($("#hero-name").val());',
+      'Inside paintAura, use .css("color", $("#aura").val()).',
+      "Keep both .on() calls outside the handler functions so each is registered once.",
     ],
     solution:
-      'function paintName() {\n  $("#name-preview").text($("#ship-name").val());\n}\n\nfunction paintSail() {\n  $("#sail").css("color", $("#sail-color").val());\n}\n\n$("#ship-name").on("keyup", paintName);\n$("#sail-color").on("change", paintSail);',
-    reward: 100,
+      'function paintName() {\n  $("#hero").text($("#hero-name").val());\n}\n\nfunction paintAura() {\n  $("#hero").css("color", $("#aura").val());\n}\n\n$("#hero-name").on("keyup", paintName);\n$("#aura").on("change", paintAura);',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 16–17 and 26, keyboard events, form events, and event registration",
     tests: [
       test(
         "The name changes only when keyup arrives",
-        [text("#name-preview", "Moonwake")],
+        [text("#hero", "Moonwake")],
         {
           steps: [
-            value("#ship-name", "Moonwake"),
-            check(text("#name-preview", "Seabird")),
-            event("#ship-name", "keyup", "e"),
+            value("#hero-name", "Moonwake"),
+            check(text("#hero", "Sparky")),
+            event("#hero-name", "keyup", "e"),
           ],
         },
       ),
       test(
         "Later typing replaces the old name, including clearing it",
-        [text("#name-preview", "")],
+        [text("#hero", "")],
         {
           steps: [
-            value("#ship-name", "Coral Runner"),
-            event("#ship-name", "keyup", "r"),
-            check(text("#name-preview", "Coral Runner")),
-            value("#ship-name", ""),
-            event("#ship-name", "keyup", "Backspace"),
+            value("#hero-name", "Coral Runner"),
+            event("#hero-name", "keyup", "r"),
+            check(text("#hero", "Coral Runner")),
+            value("#hero-name", ""),
+            event("#hero-name", "keyup", "Backspace"),
           ],
         },
       ),
       test(
-        "A change event paints the sail green",
-        [css("#sail", "color", "rgb(0, 128, 0)")],
+        "A change event turns the aura green",
+        [css("#hero", "color", "rgb(0, 128, 0)")],
         {
           steps: [
-            value("#sail-color", "green"),
-            check(css("#sail", "color", "rgb(0, 0, 255)")),
-            event("#sail-color", "change"),
+            value("#aura", "green"),
+            check(css("#hero", "color", "rgb(0, 0, 255)")),
+            event("#aura", "change"),
           ],
         },
       ),
       test(
-        "Repeated color choices remain interactive",
-        [
-          css("#sail", "color", "rgb(255, 215, 0)"),
-          text("#name-preview", "Seabird"),
-        ],
+        "Repeated color choices keep working",
+        [css("#hero", "color", "rgb(255, 215, 0)"), text("#hero", "Sparky")],
         {
           steps: [
-            value("#sail-color", "green"),
-            event("#sail-color", "change"),
-            check(css("#sail", "color", "rgb(0, 128, 0)")),
-            value("#sail-color", "gold"),
-            event("#sail-color", "change"),
+            value("#aura", "green"),
+            event("#aura", "change"),
+            check(css("#hero", "color", "rgb(0, 128, 0)")),
+            value("#aura", "gold"),
+            event("#aura", "change"),
           ],
         },
       ),
@@ -552,45 +660,55 @@ export const lessons = [
   },
   {
     id: 11,
-    title: "Roll for the horizon",
-    chapter: "The final expedition",
+    title: "Roll for damage",
+    chapter: "Final battle",
     concept: "Build an interactive dice app",
     description:
-      "The entire island is ready for its next adventure. Build the expedition’s six-sided die: every roll must be possible, every click must work, and the log must remember how far you have come.",
+      "The goblin boss is here. Build a six-sided damage die: every face possible, every click counted.",
     objectives: [
-      "Keep #die as Ready and #roll-count as 0 until #roll is clicked.",
-      "On every click, show a whole number from 1 through 6 in #die using a fresh Math.random() draw.",
+      "Keep #damage as Ready and #roll-count as 0 until #roll is clicked.",
+      "On every click, show a whole number from 1 through 6 in #damage from a fresh Math.random().",
       "Use six equal ranges: Math.floor(Math.random() * 6) + 1.",
-      "Increase #roll-count once per click and keep the expedition note unchanged.",
+      "Increase #roll-count once per click and keep #villager reading Safe.",
     ],
+    steps: [
+      "Keep rolls, $damage, and $count outside rollDie. Write inside rollDie.",
+      "const result = Math.floor(Math.random() * 6) + 1; then $damage.text(result).",
+      'rolls += 1; then $count.text(rolls). Keep $("#roll").on("click", rollDie). Run spell.',
+    ],
+    syntax: 'const result = Math.floor(Math.random() * 6) + 1;\n$damage.text(result);',
     explanation:
-      "Combine selection, setters, variables, functions, and events into a complete little app. Multiplying Math.random() by 6 gives a value from 0 up to 6. Math.floor rounds down to 0–5; adding 1 makes the six outcomes 1–6. Calculate inside the handler, and keep the roll counter outside it. The checks visit all six ranges and then roll several times in a row. Equivalent working implementations are welcome.",
+      "Combine selection, setters, variables, functions, and events into a complete little app. Math.random() * 6 gives 0 up to 6; Math.floor rounds down to 0–5; adding 1 makes 1–6. Calculate inside the handler and keep the counter outside it. The checks visit all six faces, then roll several times in a row.",
     starter:
-      'let rolls = 0;\nconst $die = $("#die");\nconst $count = $("#roll-count");\n\nfunction rollDie() {\n  // Turn a fresh random number into an integer from 1 to 6.\n  // Display it, increase rolls, and update the counter.\n}\n\n$("#roll").on("click", rollDie);',
-    html: '<section><h2>Expedition dice</h2><p id="die">Ready</p><p>Rolls: <span id="roll-count">0</span></p><button id="roll" type="button">Roll the die</button><p id="expedition-note">The horizon is yours</p></section>',
-    scene: [["#die", "crystal"], ["#roll-count", "sign"], ["#roll", "sign"], ["#expedition-note", "sign"]],
+      'let rolls = 0;\nconst $damage = $("#damage");\nconst $count = $("#roll-count");\n\nfunction rollDie() {\n  // Calculate a fresh integer from 1 to 6 and show it with $damage.text().\n  // Then add 1 to rolls and show it with $count.text().\n}\n\n$("#roll").on("click", rollDie);',
+    html: '<section id="battle"><p id="damage">Ready</p><p>Rolls: <span id="roll-count">0</span></p><button id="roll" type="button">Roll the die</button><p id="villager">Safe</p></section>',
+    scene: [
+      ["#damage", "boss", [[5, 2]], (el) => /^[1-6]$/.test(el.textContent)],
+      ["#roll-count", "label", [[2, 6]]],
+      ["#villager", "villager", VILLAGER],
+    ],
     hints: [
       "The die value is Math.floor(Math.random() * 6) + 1.",
-      "Inside rollDie, set $die.text(result), increase rolls, then set $count.text(rolls).",
-      "Register rollDie without parentheses. Draw again inside the function, not once at the top of your program.",
+      "Inside rollDie, set $damage.text(result), increase rolls, then set $count.text(rolls).",
+      "Register rollDie without parentheses. Draw inside the function, not once at the top.",
     ],
     solution:
-      'let rolls = 0;\nconst $die = $("#die");\nconst $count = $("#roll-count");\n\nfunction rollDie() {\n  const result = Math.floor(Math.random() * 6) + 1;\n  $die.text(result);\n  rolls += 1;\n  $count.text(rolls);\n}\n\n$("#roll").on("click", rollDie);',
-    reward: 100,
+      'let rolls = 0;\nconst $damage = $("#damage");\nconst $count = $("#roll-count");\n\nfunction rollDie() {\n  const result = Math.floor(Math.random() * 6) + 1;\n  $damage.text(result);\n  rolls += 1;\n  $count.text(rolls);\n}\n\n$("#roll").on("click", rollDie);',
+    reward: 20,
     source:
       "Lecture: jQuery — slides 16–24 and 28, events, refactoring, and jQuery Mini Project: Dice App",
     tests: [
       test("The die waits for its first roll", [
-        text("#die", "Ready"),
+        text("#damage", "Ready"),
         text("#roll-count", "0"),
       ]),
       ...[0, 0.2, 0.4, 0.6, 0.8, 0.999999].map((draw, index) =>
         test(
           `Face ${index + 1} can be rolled`,
           [
-            text("#die", String(index + 1)),
+            text("#damage", String(index + 1)),
             text("#roll-count", "1"),
-            text("#expedition-note", "The horizon is yours"),
+            text("#villager", "Safe"),
           ],
           { random: [draw], steps: [click("#roll")] },
         ),
@@ -598,17 +716,17 @@ export const lessons = [
       test(
         "Repeated rolls draw fresh values and keep count",
         [
-          text("#die", "3"),
+          text("#damage", "3"),
           text("#roll-count", "3"),
-          text("#expedition-note", "The horizon is yours"),
+          text("#villager", "Safe"),
         ],
         {
           random: [0, 0.999999, 0.4],
           steps: [
             click("#roll"),
-            check(text("#die", "1"), text("#roll-count", "1")),
+            check(text("#damage", "1"), text("#roll-count", "1")),
             click("#roll"),
-            check(text("#die", "6"), text("#roll-count", "2")),
+            check(text("#damage", "6"), text("#roll-count", "2")),
             click("#roll"),
           ],
         },

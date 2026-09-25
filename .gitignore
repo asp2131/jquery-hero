@@ -3,3 +3,8 @@ dist/
 .DS_Store
 .superdesign/tmp/
 .vercel
+
+# Licensed art: use in builds only, never redistribute raw files
+Isometric dungeon tiles 2d by RgsDev/
+animated slime/
+*.zip

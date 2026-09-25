@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Battle spike · The goblin march</title>
+    <style>
+      body { margin: 0; display: grid; grid-template-columns: 360px 1fr; height: 100vh; font: 14px system-ui, sans-serif; background: #172522; color: #e6ecdf; }
+      aside { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+      pre { margin: 0; padding: 10px; border-radius: 8px; background: #0f1a18; color: #9fb5a8; font: 12px/1.5 "DM Mono", monospace; white-space: pre-wrap; }
+      textarea { flex: 1; resize: none; padding: 12px; border: 0; border-radius: 8px; background: #0f1a18; color: #d3f68e; font: 13px/1.7 "DM Mono", monospace; }
+      button { padding: 10px; border: 0; border-radius: 8px; background: #d3f68e; color: #172522; font-weight: 700; cursor: pointer; }
+      button:disabled { opacity: .5; cursor: default; }
+      #status[data-status="won"] { color: #d3f68e; }
+      #status[data-status="lost"] { color: #ff8a7a; }
+      iframe { width: 100%; height: 100%; border: 0; }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <strong>Battle · The goblin march</strong>
+      <span>Banish every <code>.goblin</code>. Keep <code>#villager</code> and <code>#hero</code> standing. Each run is one turn, then the goblins move.</span>
+      <pre id="html"></pre>
+      <textarea id="code" spellcheck="false">// One goblin per turn won't be fast enough.
+$("#goblin-1").fadeOut();</textarea>
+      <strong id="status" role="status" aria-live="polite"></strong>
+      <button id="run">Cast (end turn)</button>
+      <button id="reset">Restart battle</button>
+    </aside>
+    <iframe id="world" sandbox="allow-scripts" title="Battlefield"></iframe>
+    <script type="module">
+      import { buildBattleDoc, battleHtml } from "./src/battle-dom.js";
+      const world = document.getElementById("world");
+      const run = document.getElementById("run");
+      const status = document.getElementById("status");
+      document.getElementById("html").textContent = battleHtml;
+      const reset = () => (world.srcdoc = buildBattleDoc());
+      window.addEventListener("message", ({ source, data }) => {
+        if (source !== world.contentWindow) return;
+        status.dataset.status = data.status;
+        status.textContent = `Turn ${data.turn} · ${data.message}`;
+        run.disabled = data.status !== "playing";
+      });
+      run.onclick = () => {
+        run.disabled = true;
+        world.contentWindow.postMessage({ code: document.getElementById("code").value }, "*");
+      };
+      document.getElementById("reset").onclick = reset;
+      reset();
+    </script>
+  </body>
+</html>

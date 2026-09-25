@@ -23,10 +23,11 @@ import {
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { lessons } from "./lessons.js";
-import { createWorld } from "./world.js";
+import { createArena } from "./arena.js";
 
 const $ = (id) => document.getElementById(id);
-const STORAGE_KEY = "jquery-quest-v1";
+// v2: battle lessons. v1 progress carries over; its drafts are old island code.
+const STORAGE_KEY = "jquery-quest-v2";
 const number = (n) => String(n + 1).padStart(2, "0");
 const escapeHTML = (text) =>
   String(text).replace(
@@ -40,12 +41,14 @@ let storageAvailable = true;
 let state = {
   active: 0,
   completed: [],
-  collected: [],
   drafts: {},
   sound: false,
 };
 try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") ?? {
+    ...JSON.parse(localStorage.getItem("jquery-quest-v1") || "null"),
+    drafts: {},
+  };
   if (saved && typeof saved === "object") {
     const validIds = (list) =>
       Array.isArray(list)
@@ -62,9 +65,6 @@ try {
     let frontier = 0;
     while (completed.includes(frontier)) frontier++;
     state.completed = Array.from({ length: frontier }, (_, i) => i);
-    state.collected = validIds(saved.collected).filter((n) =>
-      state.completed.includes(n),
-    );
     state.active = Number.isInteger(saved.active)
       ? Math.max(0, Math.min(saved.active, frontier, lessons.length - 1))
       : 0;
@@ -80,11 +80,11 @@ try {
 }
 let running = false;
 let loadingLesson = false;
-let exploring = false;
 let hintCount = 0;
 let currentResult = null;
 let toastTimer;
 let audio;
+const currentLesson = () => lessons[state.active];
 
 function save() {
   const wasAvailable = storageAvailable;
@@ -136,14 +136,15 @@ function chime(kind = "pass") {
   }
 }
 const highlights = HighlightStyle.define([
-  { tag: tags.comment, color: "#6e876f", fontStyle: "italic" },
-  { tag: tags.string, color: "#c2da8d" },
-  { tag: tags.keyword, color: "#d1a881" },
-  { tag: tags.function(tags.variableName), color: "#b4d6bf" },
-  { tag: tags.number, color: "#cba384" },
-  { tag: tags.operator, color: "#b4bfa2" },
-  { tag: tags.punctuation, color: "#9aac98" },
-  { tag: tags.variableName, color: "#e0e5ce" },
+  { tag: tags.comment, color: "#6c819a", fontStyle: "italic" },
+  { tag: tags.string, color: "#ff8a95" },
+  { tag: tags.keyword, color: "#c7a2ff" },
+  { tag: tags.function(tags.variableName), color: "#34d8f2" },
+  { tag: [tags.propertyName, tags.function(tags.propertyName)], color: "#ffd166" },
+  { tag: tags.number, color: "#f7a26c" },
+  { tag: tags.operator, color: "#c4d0de" },
+  { tag: tags.punctuation, color: "#c4d0de" },
+  { tag: tags.variableName, color: "#34d8f2" },
 ]);
 const editorExtensions = [
   lineNumbers(),
@@ -184,7 +185,7 @@ const editorExtensions = [
     }
   }),
   EditorView.theme(
-    { "&": { color: "#dbe4ce", backgroundColor: "#172522" } },
+    { "&": { color: "#e6edf5", backgroundColor: "#0b1a2c" } },
     { dark: true },
   ),
 ];
@@ -192,50 +193,37 @@ const editor = new EditorView({
   state: EditorState.create({ doc: "", extensions: editorExtensions }),
   parent: $("editor"),
 });
-const world = createWorld($("world"), {
-  onStatus(message) {
-    if ($("world-tip").textContent !== message)
-      $("world-tip").textContent = message;
-  },
-  onCollect(index) {
-    if (!state.completed.includes(index) || state.collected.includes(index))
-      return;
-    state.collected.push(index);
-    save();
-    renderProgress();
-    chime("crystal");
-    toast(
-      state.collected.length === lessons.length
-        ? "All 12 crystals found. You restored every corner of the island!"
-        : `Crystal found! ${state.collected.length} / ${lessons.length} tucked safely in your pack.`,
-    );
-  },
-  onReach(index) {
-    if (index !== state.active && isUnlocked(index) && !running) {
-      selectLesson(index, { fromWorld: true });
-      toast(`Reached quest ${number(index)}: ${lessons[index].title}`);
-    }
-  },
-});
+const arena = createArena($("arena"));
 function isUnlocked(index) {
   return (
     index >= 0 && index < lessons.length && index <= state.completed.length
   );
 }
 function renderProgress() {
-  $("crystal-value").textContent = state.collected.length;
+  $("crystal-value").textContent = state.completed.reduce(
+    (sum, index) => sum + lessons[index].reward,
+    0,
+  );
   $("progress-value").textContent =
     `${state.completed.length} / ${lessons.length}`;
-  $("progress-fill").style.width =
-    `${(state.completed.length / lessons.length) * 100}%`;
-  world.setProgress({
-    completed: state.completed,
-    active: state.active,
-    collected: state.collected,
-  });
+  $("quest-dots").replaceChildren(
+    ...lessons.map((lesson, index) => {
+      const li = document.createElement("li");
+      const dot = document.createElement("button");
+      dot.classList.toggle("done", state.completed.includes(index));
+      if (index === state.active)
+        dot.setAttribute("aria-current", "step");
+      dot.disabled = !isUnlocked(index) || running;
+      dot.title = `Quest ${index + 1}: ${lesson.title}`;
+      dot.setAttribute("aria-label", dot.title);
+      dot.onclick = () => selectLesson(index);
+      li.append(dot);
+      return li;
+    }),
+  );
 }
 function renderTests() {
-  const tests = currentResult?.tests || lessons[state.active].tests;
+  const tests = currentResult?.tests || currentLesson().tests;
   $("test-results").replaceChildren(
     ...tests.map((test) => {
       const row = document.createElement("div");
@@ -260,37 +248,53 @@ function renderTests() {
   $("test-section").hidden = !currentResult;
   $("run-error").hidden = !currentResult?.error;
   $("run-error").textContent = currentResult?.error || "";
-  $("continue-button").hidden = !state.completed.includes(state.active);
+  const complete = state.completed.includes(state.active);
+  $("continue-button").hidden = !complete;
   // Once a quest is done, moving on becomes the primary action.
   document
     .querySelector(".run-section")
-    .classList.toggle("complete", state.completed.includes(state.active));
+    .classList.toggle("complete", complete);
   $("continue-button").innerHTML =
     state.active === lessons.length - 1
       ? "See your adventure <span>→</span>"
-      : "On to the next quest <span>→</span>";
+      : "Next quest <span>→</span>";
 }
-function setScene(lesson, html) {
-  // DOMParser never runs scripts; the scene reads only text, inline styles, and classes.
+function setScene(lesson, html, animate = false) {
+  // DOMParser never runs scripts; the arena reads only text, inline styles, classes, and attributes.
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const props = [];
+  const matched = lesson.scene.map(() => 0);
+  const actors = [];
   for (const el of doc.body.querySelectorAll("*")) {
-    const rule = lesson.scene.find(([selector]) => el.matches(selector));
-    if (!rule) continue;
-    const [, kind, lit = () => true] = rule;
+    const rule = lesson.scene.findIndex(([selector]) => el.matches(selector));
+    if (rule < 0) continue;
+    const [, kind, spawns, on = () => false] = lesson.scene[rule];
+    const n = matched[rule]++;
+    // ponytail: extra matches line up behind the last spawn point; fine for a stray append or two.
+    const [x, y, level = 0] = spawns[n] ?? [spawns.at(-1)[0], spawns.at(-1)[1] + n - spawns.length + 1];
     let hidden = false;
     for (let node = el; node; node = node.parentElement)
       if (node.style.display === "none") hidden = true;
-    props.push({
+    actors.push({
+      key: el.id || `${rule}:${n}`,
       kind,
-      lit: lit(el),
+      x,
+      y,
+      level,
+      on: on(el),
       hidden,
-      text: el.textContent.trim(),
+      tag: el.id ? `#${el.id}` : `.${el.classList[0]}`,
+      classes: [...el.classList],
+      text: el.children.length ? "" : el.textContent.trim(),
       color: el.style.color,
       background: el.style.backgroundColor,
     });
   }
-  world.setScene(props);
+  arena.setScene(actors, animate);
+}
+function setHud(status, headline, message) {
+  $("battle-hud").dataset.status = status;
+  $("battle-headline").textContent = headline;
+  $("battle-status").textContent = message;
 }
 function selectTab(name) {
   for (const tab of ["js", "html"]) {
@@ -302,57 +306,50 @@ function selectTab(name) {
   }
   if (name === "js") editor.requestMeasure();
 }
-function selectLesson(index, { fromWorld = false } = {}) {
-  if (!isUnlocked(index) || running) return;
-  state.active = index;
+function renderLesson(lesson, key) {
   hintCount = 0;
   currentResult = null;
-  const lesson = lessons[index];
   loadingLesson = true;
   editor.setState(
     EditorState.create({
-      doc: state.drafts[index] ?? lesson.starter,
+      doc: state.drafts[key] ?? lesson.starter,
       extensions: editorExtensions,
     }),
   );
   loadingLesson = false;
-  $("mission-number").textContent = `Quest ${index + 1}`;
+  $("mission-number").textContent = `QUEST ${number(state.active)} / ${lessons.length}`;
+  $("hud-chapter").textContent = lesson.chapter;
+  $("hud-quest").textContent = `Quest ${number(state.active)} / ${lessons.length} · ${lesson.title}`;
+  setHud("playing", "Your move", "Write your spell in quest.js, then press Run spell.");
   $("mission-concept").textContent = lesson.concept;
   $("mission-title").textContent = lesson.title;
   $("mission-description").textContent = lesson.description;
   $("guide-note").textContent = lesson.explanation;
   $("source-label").textContent = lesson.source;
-  $("objectives").replaceChildren(
-    ...lesson.objectives.map((text) => {
+  for (const [id, items] of [["objectives", lesson.objectives], ["coding-steps", lesson.steps]]) {
+    $(id).replaceChildren(...items.map((text) => {
       const li = document.createElement("li");
       li.textContent = text;
       return li;
-    }),
-  );
+    }));
+  }
+  $("syntax-example").textContent = lesson.syntax;
   $("html-source").textContent = lesson.html;
   $("hint-panel").hidden = true;
+  $("run-label").textContent = "Run spell";
   selectTab("js");
-  setScene(lesson, lesson.html);
   renderTests();
   renderProgress();
+}
+
+function selectLesson(index) {
+  if (!isUnlocked(index) || running) return;
+  state.active = index;
+  renderLesson(lessons[index], index);
+  setScene(lessons[index], lessons[index].html);
   save();
-  if (!fromWorld) {
-    setExploring(false);
-    world.travelTo(index);
-  }
 }
-function setExploring(value) {
-  exploring = value;
-  world.setExploring(value);
-  $("explore-button").setAttribute("aria-pressed", String(value));
-  $("explore-button").textContent = value ? "Back to coding" : "Explore island";
-  $("movement-controls").hidden = !value;
-  $("world-tip").hidden = !value;
-  if (value) {
-    world.focus();
-    $("world").scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }
-}
+
 async function execute() {
   if (running) return;
   running = true;
@@ -361,7 +358,8 @@ async function execute() {
   const submittedCode = editor.state.doc.toString();
   $("run-button").disabled = true;
   $("reset-code").disabled = true;
-  $("run-label").textContent = "Checking your spell…";
+  $("run-label").textContent = "Casting…";
+  setHud("playing", "Casting…", "Your spell is running against the battlefield.");
   $("continue-button").hidden = true;
   renderProgress();
   try {
@@ -375,7 +373,9 @@ async function execute() {
       return;
     }
     currentResult = result;
-    setScene(lesson, result.html || lesson.html);
+    // Replay every spell from the starting battlefield so the arena shows exactly what this code did.
+    setScene(lesson, lesson.html);
+    setScene(lesson, result.html || lesson.html, true);
     const passed =
       !result.error &&
       result.tests.length > 0 &&
@@ -389,15 +389,24 @@ async function execute() {
         document.body.classList.remove("celebrate");
         requestAnimationFrame(() => document.body.classList.add("celebrate"));
         setTimeout(() => document.body.classList.remove("celebrate"), 1500);
-        toast(
-          `Quest complete! +${lesson.reward} XP. A gold crystal is waiting near your beacon.`,
-        );
       }
-      $("run-caption").textContent =
-        "Beautifully done. Your code brought the island to life.";
+      setHud(
+        "won",
+        "Spell successful",
+        `${result.tests.length} / ${result.tests.length} checks passed${firstPass ? ` · +${lesson.reward} crystals` : ""}`,
+      );
+      $("run-caption").textContent = "Beautifully done. Your code won the fight.";
       if (state.completed.length === lessons.length && firstPass)
         showCompletion();
     } else {
+      const passedCount = result.tests.filter((test) => test.passed).length;
+      setHud(
+        "lost",
+        result.error ? "Spell fizzled" : "Not quite",
+        result.error
+          ? "Your code hit an error. Fix it and cast again."
+          : `${passedCount} / ${result.tests.length} checks passed. Tweak your spell and try again.`,
+      );
       $("run-caption").textContent =
         "Not quite yet. Read the checkpoints, tweak your code, try again.";
     }
@@ -413,12 +422,13 @@ async function execute() {
       html: lesson.html,
     };
     $("run-caption").textContent = "Your code hit an error.";
+    setHud("lost", "Spell fizzled", "Your code hit an error. Fix it and cast again.");
     renderTests();
   } finally {
     running = false;
     $("run-button").disabled = false;
     $("reset-code").disabled = false;
-    $("run-label").textContent = "Run code";
+    $("run-label").textContent = "Run spell";
     renderProgress();
   }
 }
@@ -430,9 +440,9 @@ function showDialog(title, eyebrow, html) {
 }
 function showMap() {
   showDialog(
-    "Every island starts with a spark.",
-    "YOUR JOURNEY · 12 QUESTS",
-    `<p class="dialog-copy">Write a little code, pass the checkpoints, then explore. Each restored beacon reveals a golden crystal. Completed quests are always open for practice.</p><div class="quest-list">${lessons.map((lesson) => `<button class="quest-choice" data-quest="${lesson.id}" ${!isUnlocked(lesson.id) || running ? "disabled" : ""}><span>${state.completed.includes(lesson.id) ? "✓" : number(lesson.id)}</span><div><strong>${escapeHTML(lesson.title)}</strong><small>${!isUnlocked(lesson.id) ? "LOCKED · COMPLETE THE PREVIOUS QUEST" : escapeHTML(lesson.concept)}</small></div></button>`).join("")}</div>`,
+    "Choose your next challenge.",
+    "12 BATTLES",
+    `<p class="dialog-copy">Each battle teaches one jQuery skill. They unlock in order.</p><div class="quest-list">${lessons.map((lesson) => `<button class="quest-choice" data-quest="${lesson.id}" ${!isUnlocked(lesson.id) || running ? "disabled" : ""}><span>${state.completed.includes(lesson.id) ? "✓" : number(lesson.id)}</span><div><strong>${escapeHTML(lesson.title)}</strong><small>${!isUnlocked(lesson.id) ? "LOCKED · COMPLETE THE PREVIOUS QUEST" : escapeHTML(lesson.concept)}</small></div></button>`).join("")}</div>`,
   );
   $("dialog-content")
     .querySelectorAll("[data-quest]")
@@ -446,18 +456,23 @@ function showMap() {
 function showGuide() {
   const sections = [
     [
+      "Your code is your move",
+      '$(".goblin").addClass("hit");',
+      "Every character in the arena is an element in index.html. The cyan tag under it is its selector: a dot means a shared class, # means one ID. Edit quest.js, then Run spell (or Cmd/Ctrl + Enter). The hero casts at everything your code changed, so you can see exactly what you selected.",
+    ],
+    [
       "01 · A library, not a new language",
       '$("selector").action();',
       "jQuery is JavaScript with a helpful toolbox for HTML and CSS. It is already imported here. In your own page, load a pinned jQuery script before your application script.",
     ],
     [
       "02 · Find the right element",
-      '$("p")        // all paragraph elements\n$(".secret")  // every element with this class\n$("#beacon")  // the element with this ID',
-      "A selector finds existing elements. An action changes them. Check index.html to see the exact IDs, classes, and starting state for each quest.",
+      '$("p")        // all paragraph elements\n$(".secret")  // every element with this class\n$("#hero")    // the element with this ID',
+      "A selector finds existing elements. An action changes them. Each instruction card tells you which selector and method to use; index.html is only a reference for the starting elements.",
     ],
     [
-      "03 · Change what the world sees",
-      '$("#beacon").text("Awake");\n$(".secret").show();\n$(".fog").hide();\n$("#hero").css("color", "green");\n$("#hero").addClass("ready").removeClass("sleepy");',
+      "03 · Change what the arena sees",
+      '$("#hero").text("Ready");\n$(".secret").show();\n$(".smoke").hide();\n$("#hero").css("color", "green");\n$("#hero").addClass("ready").removeClass("sleepy");',
       'Calling .text() or .css("color") without a new value reads the current value. Most setters return the jQuery collection, so you can chain actions.',
     ],
     [
@@ -467,7 +482,7 @@ function showGuide() {
     ],
     [
       "05 · Let the player take a turn",
-      'function wake() {\n  $("#beacon").text("Awake");\n}\n$("#button").on("click", wake);',
+      'function wake() {\n  $("#hero").text("Ready");\n}\n$("#button").on("click", wake);',
       "Pass the function itself, not wake(). Parentheses call it immediately! Other events include keydown, keyup, change, submit, mouseenter, focus, and blur.",
     ],
     [
@@ -479,23 +494,19 @@ function showGuide() {
   showDialog(
     "A pocket guide to jQuery.",
     "YOUR FIELD GUIDE",
-    `<p class="dialog-copy">No need to memorize everything. Keep experimenting. Your progress is saved in this browser; no account or server is involved.</p>${sections.map(([title, code, text]) => `<section class="reference-section"><h3>${title}</h3><code>${escapeHTML(code)}</code><p>${escapeHTML(text)}</p></section>`).join("")}<section class="reference-section"><h3>Explore your island</h3><p>Press Explore island, then hold arrow keys, WASD, or the on-screen arrows to walk. Hold Shift to sprint. Click a tile or quest number to follow a dotted route around obstacles; press Escape to stop at the next tile. Gold crystals near completed beacons go into your pack when you reach them. Dim paths open as you pass exercises. Returning to the editor stops held movement. In the editor, use Tab to indent and Cmd/Ctrl + Enter to run.</p></section>`,
+    `<p class="dialog-copy">No need to memorize everything. Keep experimenting. Your progress is saved in this browser; no account or server is involved.</p>${sections.map(([title, code, text]) => `<section class="reference-section"><h3>${title}</h3><code>${escapeHTML(code)}</code><p>${escapeHTML(text)}</p></section>`).join("")}<section class="reference-section"><h3>Editor keys</h3><p>Tab indents. Cmd/Ctrl + Enter runs your spell.</p></section>`,
   );
 }
 function showCompletion() {
   showDialog(
-    "You are the island keeper.",
+    "The fortress is yours.",
     "CAMPAIGN COMPLETE",
-    `<div class="completion-art">{ ✧ }</div><p class="completion-copy">Twelve quests. One island brought back to life.<br>You selected, styled, created, and connected a whole world with real jQuery.</p><div class="completion-stats"><span>1,200 XP</span><span>${state.collected.length} / 12 crystals</span></div><p class="completion-copy">There is still room to wander. Find every crystal or revisit any quest and try a different solution.</p><div class="dialog-actions"><button id="completion-explore" class="primary">Explore your restored island →</button><button id="completion-map">Revisit the quests</button></div>`,
+    `<div class="completion-art">{ ✧ }</div><p class="completion-copy">Twelve battles won.<br>You selected, styled, created, and connected a whole battlefield with real jQuery.</p><div class="completion-stats"><span>${lessons.reduce((sum, lesson) => sum + lesson.reward, 0)} crystals</span></div><div class="dialog-actions"><button id="completion-map" class="primary">Revisit the quests</button></div>`,
   );
-  $("completion-explore").onclick = () => {
-    $("game-dialog").close();
-    setExploring(true);
-  };
   $("completion-map").onclick = showMap;
 }
 function showHints() {
-  const lesson = lessons[state.active];
+  const lesson = currentLesson();
   hintCount = Math.min(hintCount + 1, lesson.hints.length);
   $("hint-panel").hidden = false;
   $("hint-content").replaceChildren(
@@ -512,7 +523,7 @@ function confirmReset() {
   showDialog(
     "A fresh page in your spellbook?",
     "RESET THIS EXERCISE",
-    '<p class="dialog-copy">This replaces only the current quest’s code with its starter. Your completed quests, XP, crystals, and other code are kept.</p><div class="dialog-actions"><button id="confirm-reset" class="primary">Reset this code</button><button id="cancel-reset">Keep writing</button></div>',
+    `<p class="dialog-copy">This replaces the current exercise’s code with its starter and resets the battlefield. Your completed quests, crystals, and other drafts are kept.</p><div class="dialog-actions"><button id="confirm-reset" class="primary">Reset this code</button><button id="cancel-reset">Keep writing</button></div>`,
   );
   $("confirm-reset").onclick = () => {
     $("game-dialog").close();
@@ -520,12 +531,13 @@ function confirmReset() {
       changes: {
         from: 0,
         to: editor.state.doc.length,
-        insert: lessons[state.active].starter,
+        insert: currentLesson().starter,
       },
     });
     currentResult = null;
     renderTests();
-    setScene(lessons[state.active], lessons[state.active].html);
+    setScene(currentLesson(), currentLesson().html);
+    setHud("playing", "Your move", "Write your spell in quest.js, then press Run spell.");
     selectTab("js");
     editor.focus();
   };
@@ -546,7 +558,7 @@ $("hint-button").onclick = () => {
 };
 $("next-hint").onclick = showHints;
 $("solution-button").onclick = () => {
-  const lesson = lessons[state.active];
+  const lesson = currentLesson();
   showDialog(
     "One way through.",
     `QUEST ${number(state.active)} · EXAMPLE SOLUTION`,
@@ -559,27 +571,6 @@ $("solution-button").onclick = () => {
   };
 };
 $("reset-code").onclick = confirmReset;
-$("explore-button").onclick = () => setExploring(!exploring);
-document.querySelectorAll("[data-direction]").forEach((btn) => {
-  btn.onpointerdown = (event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    if (!exploring) setExploring(true);
-    world.focus();
-    btn.setPointerCapture(event.pointerId);
-    world.setDirection(btn.dataset.direction, true);
-  };
-  const release = () => world.setDirection(btn.dataset.direction, false);
-  btn.onpointerup = release;
-  btn.onpointercancel = release;
-  btn.onlostpointercapture = release;
-  // Keyboard and assistive-technology activation remains a single step.
-  btn.onclick = (event) => {
-    if (event.detail !== 0) return;
-    if (!exploring) setExploring(true);
-    world.move(btn.dataset.direction);
-  };
-});
 for (const name of ["js", "html"]) {
   $(`tab-${name}`).onclick = () => selectTab(name);
   $(`tab-${name}`).onkeydown = (event) => {
@@ -634,7 +625,7 @@ selectLesson(state.active);
 renderSound();
 if (import.meta.hot)
   import.meta.hot.dispose(() => {
-    world.destroy();
+    arena.destroy();
     editor.destroy();
     audio?.close();
     clearTimeout(toastTimer);
