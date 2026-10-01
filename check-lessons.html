@@ -3,17 +3,17 @@
 import { lessons } from "/src/lessons.js";
 import { runExercise } from "/src/runner.js";
 const mutants = {
-  12: [['  } else {\n    $("#hero").text("Unsupported");\n  }', "  }"]],
-  13: [['hp < 30) {\n    $("#hero").text("Critical");\n  } else if (hp < 70) {\n    $("#hero").text("Wounded")', 'hp < 70) {\n    $("#hero").text("Wounded");\n  } else if (hp < 30) {\n    $("#hero").text("Critical")']],
-  14: [['word !== "moonbeam"', 'word.toLowerCase() !== "moonbeam"']],
-  15: [["function dodgeRoll() {\n  if (Math.random() > 0.5)", "const roll = Math.random();\nfunction dodgeRoll() {\n  if (roll > 0.5)"]],
-  16: [["  shieldUp = !shieldUp;\n", "  shieldUp = true;\n"]],
-  17: [["hasRedKey && hasBlueKey", "hasRedKey || hasBlueKey"]],
-  18: [["level >= 5", "level > 5"], ["level >= 5 || hasBadge", "level >= 5 && hasBadge"]],
-  19: [["hasKey && (level >= 5 || hasBadge)", "hasKey && level >= 5 || hasBadge"]],
-  20: [['  if (arrows) {\n    arrows -= 1;', '  arrows -= 1;\n  if (arrows >= 0) {']],
-  21: [['$("#message").text("Welcome, " + name)', '$("#message").text("Welcome " + name)']],
-  22: [['result === "Heads" ? "gold"', 'Math.random() > 0.5 ? "gold"']],
+  12: [["return !user.isAdmin;", "return user.isAdmin;"], ["return !user.isAdmin;", "return !user;"]],
+  13: [["hasMana && hasWand", "hasMana || hasWand"], ["hasMana && hasWand", "hasMana"]],
+  14: [["hasRope || hasKey", "hasRope && hasKey"], ["hasRope || hasKey", "hasKey"]],
+  15: [['!user.isAdmin && user.name === "John"', '!user.isAdmin || user.name === "John"'], ['!user.isAdmin && user.name === "John"', 'user.name === "John"']],
+  16: [["return !shieldUp;", "return true;"], ["if (hero.shieldUp)", "if (hero)"]],
+  17: [["hero.hasRedKey && hero.hasBlueKey", "hero.hasRedKey || hero.hasBlueKey"]],
+  18: [["user.age >= 18", "user.age > 18"], ["user.age >= 18 || user.isAdmin", "user.age >= 18 && user.isAdmin"]],
+  19: [['user.name === "John" && (user.isAdmin || user.age >= 18)', 'user.name === "John" && user.isAdmin || user.age >= 18']],
+  20: [['  if (arrows) {\n    arrows -= 1;', '  arrows -= 1;\n  if (arrows) {']],
+  21: [['"Welcome, " + name', '"Welcome " + name'], ["if (!name)", 'if (name === "")']],
+  22: [["Math.random() > 0.5", "Math.random() >= 0.5"], ['result === "Heads" ? "gold"', 'Math.random() > 0.5 ? "gold"']],
   23: [
     ["a.x < bRight && aRight > b.x", "a.x <= bRight && aRight >= b.x"],
     [" && a.y < bBottom && aBottom > b.y", ""],

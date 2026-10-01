@@ -21,7 +21,7 @@ import {
   indentOnInput,
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
-import { lessons } from "./lessons.js";
+import { lessons, topicOf } from "./lessons.js";
 import { createArena } from "./arena.js";
 import { syntaxSupport } from "./editor-syntax.js";
 
@@ -106,13 +106,14 @@ try {
           ]
         : [];
     const completed = validIds(saved.completed);
-    // A campaign unlock is always a contiguous prefix, even with an old/corrupt save.
-    let frontier = 0;
-    while (completed.includes(frontier)) frontier++;
-    state.completed = Array.from({ length: frontier }, (_, i) => i);
-    state.active = Number.isInteger(saved.active)
-      ? Math.max(0, Math.min(saved.active, frontier, lessons.length - 1))
-      : 0;
+    // Each topic's unlocks are a contiguous prefix, even with an old/corrupt save.
+    for (const lesson of lessons)
+      if (completed.includes(lesson.id) && isUnlocked(lesson.id))
+        state.completed.push(lesson.id);
+    state.active =
+      Number.isInteger(saved.active) && isUnlocked(saved.active)
+        ? saved.active
+        : 0;
     state.sound = saved.sound === true;
     if (saved.drafts && typeof saved.drafts === "object") {
       for (const lesson of lessons)
@@ -263,7 +264,11 @@ const editor = new EditorView({
 const arena = createArena($("arena"));
 function isUnlocked(index) {
   return (
-    index >= 0 && index < lessons.length && index <= state.completed.length
+    index >= 0 &&
+    index < lessons.length &&
+    (index === 0 ||
+      state.completed.includes(index - 1) ||
+      topicOf(lessons[index]) !== topicOf(lessons[index - 1]))
   );
 }
 function renderProgress() {
@@ -273,6 +278,8 @@ function renderProgress() {
   );
   $("progress-value").textContent =
     `${state.completed.length} / ${lessons.length}`;
+  $("topic-select").value = topicOf(currentLesson());
+  $("topic-select").disabled = running;
   $("quest-dots").replaceChildren(
     ...lessons.map((lesson, index) => {
       const li = document.createElement("li");
@@ -380,6 +387,11 @@ function setScene(lesson, html, animate = false) {
   }
   arena.setScene(actors, animate);
 }
+function showConsole(logs) {
+  $("html-source").textContent =
+    logs.join("\n") ||
+    "Nothing logged yet. Add console.log(...) to your code and run it to see values here.";
+}
 function setHud(status, headline, message) {
   $("battle-hud").dataset.status = status;
   $("battle-headline").textContent = headline;
@@ -395,7 +407,11 @@ function selectTab(name) {
   }
   $("syntax-status").hidden = name !== "js";
   $("editor-shortcut").textContent =
-    name === "js" ? runShortcut : "Read-only reference";
+    name === "js"
+      ? runShortcut
+      : currentLesson().console
+        ? "Output from your last run"
+        : "Read-only reference";
   if (name === "js") editor.requestMeasure();
 }
 function renderLesson(lesson, key) {
@@ -429,7 +445,15 @@ function renderLesson(lesson, key) {
     }));
   }
   $("syntax-example").textContent = lesson.syntax;
-  $("html-source").innerHTML = formatHTML(lesson.html);
+  // Plain-JavaScript quests swap the read-only index.html for a console.
+  $("tab-html").innerHTML = lesson.console
+    ? "console"
+    : "index.html <small>read-only</small>";
+  if (lesson.console) showConsole([]);
+  else $("html-source").innerHTML = formatHTML(lesson.html);
+  $("coding-note").innerHTML = lesson.console
+    ? "Plain JavaScript, no jQuery. Write in <strong>quest.js</strong>; your <strong>console.log</strong> output appears in the <strong>console</strong> tab."
+    : "jQuery is ready to use. Write in <strong>quest.js</strong>; <strong>index.html</strong> is your read-only reference.";
   $("run-label").textContent = "Run spell";
   selectTab("js");
   renderTests();
@@ -468,13 +492,15 @@ async function execute() {
       return;
     }
     currentResult = result;
-    // Replay every spell from the starting battlefield so the arena shows exactly what this code did.
-    setScene(lesson, lesson.html);
-    setScene(lesson, result.html || lesson.html, true);
     const passed =
       !result.error &&
       result.tests.length > 0 &&
       result.tests.every((test) => test.passed);
+    // Replay every spell from the starting battlefield so the arena shows exactly what this code did.
+    // Console quests don't touch the page, so a win shows the lesson's victory scene instead.
+    setScene(lesson, lesson.html);
+    setScene(lesson, (passed && lesson.won) || result.html || lesson.html, true);
+    if (lesson.console) showConsole(result.logs);
     if (passed) {
       const firstPass = !state.completed.includes(index);
       if (firstPass) {
@@ -533,7 +559,7 @@ function showMap() {
   showDialog(
     "Choose your next challenge.",
     `${lessons.length} BATTLES`,
-    `<p class="dialog-copy">Each battle teaches one new skill. They unlock in order.</p><div class="quest-list">${lessons.map((lesson) => `<button class="quest-choice" data-quest="${lesson.id}" ${!isUnlocked(lesson.id) || running ? "disabled" : ""}><span>${state.completed.includes(lesson.id) ? "✓" : number(lesson.id)}</span><div><strong>${escapeHTML(lesson.title)}</strong><small>${!isUnlocked(lesson.id) ? "LOCKED · COMPLETE THE PREVIOUS QUEST" : escapeHTML(lesson.concept)}</small></div></button>`).join("")}</div>`,
+    `<p class="dialog-copy">Each battle teaches one new skill. They unlock in order within each topic.</p><div class="quest-list">${lessons.map((lesson) => `<button class="quest-choice" data-quest="${lesson.id}" ${!isUnlocked(lesson.id) || running ? "disabled" : ""}><span>${state.completed.includes(lesson.id) ? "✓" : number(lesson.id)}</span><div><strong>${escapeHTML(lesson.title)}</strong><small>${!isUnlocked(lesson.id) ? "LOCKED · COMPLETE THE PREVIOUS QUEST" : escapeHTML(lesson.concept)}</small></div></button>`).join("")}</div>`,
   );
   $("dialog-content")
     .querySelectorAll("[data-quest]")
@@ -660,6 +686,19 @@ $("continue-button").onclick = () => {
     : selectLesson(state.active + 1);
 };
 $("map-button").onclick = showMap;
+$("topic-select").append(
+  ...[...new Set(lessons.map(topicOf))].map((topic) => new Option(topic)),
+);
+// Jump to the topic's first unfinished quest, which is always unlocked.
+$("topic-select").onchange = (event) => {
+  const quests = lessons.filter(
+    (lesson) => topicOf(lesson) === event.target.value,
+  );
+  selectLesson(
+    (quests.find((lesson) => !state.completed.includes(lesson.id)) ??
+      quests[0]).id,
+  );
+};
 $("guide-button").onclick = showGuide;
 for (const name of Object.keys(helpTitles)) {
   $(`${name}-button`).onclick = () => {

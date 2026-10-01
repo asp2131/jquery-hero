@@ -71,6 +71,7 @@ function instrument(code, guardName) {
 function sandboxBootstrap(configuration) {
   const { token, nonce, guardName, guardSlot, code, test, targetOrigin } =
     configuration;
+  const exposeSlot = `${guardSlot}_expose`;
   const root = document.getElementById("quest-fixture");
   const nativeSetTimeout = window.setTimeout.bind(window);
   const nativeClearTimeout = window.clearTimeout.bind(window);
@@ -98,6 +99,10 @@ function sandboxBootstrap(configuration) {
     "textContent",
   ).get;
   const remembered = new Map();
+  // console.log lines, and the functions the tests call by name.
+  const logs = [];
+  let logStart = 0;
+  let exported = {};
   let runtimeError = null;
   let completed = false;
   let checkTimer;
@@ -151,6 +156,28 @@ function sandboxBootstrap(configuration) {
     value: () => draws[Math.min(drawIndex++, draws.length - 1)],
   });
 
+  const show = (value) =>
+    typeof value === "string"
+      ? JSON.stringify(value)
+      : value && typeof value === "object"
+        ? `{ ${Object.entries(value)
+            .map(([key, item]) => `${key}: ${show(item)}`)
+            .join(", ")} }`
+        : String(value);
+  console.log = (...args) => {
+    logs[logs.length] = args
+      .map((arg) => (typeof arg === "string" ? arg : String(arg)))
+      .join(" ")
+      .slice(0, 500);
+  };
+  function learnerFunction(name) {
+    if (typeof exported[name] !== "function")
+      fail(
+        `Cannot find a function named ${name}. Keep its name exactly as in the starter.`,
+      );
+    return exported[name];
+  }
+
   function guard() {
     ticks += 1;
     if (ticks > 20000 || nativeNow() > deadline) {
@@ -178,6 +205,7 @@ function sandboxBootstrap(configuration) {
         detail,
         error: runtimeError,
         html: snapshot(),
+        logs: logs.slice(0, 200),
       },
       targetOrigin,
     );
@@ -207,6 +235,27 @@ function sandboxBootstrap(configuration) {
   }
 
   function assertOne(assertion) {
+    if (assertion.type === "logs") {
+      const actual = logs.slice(logStart);
+      const list = (lines) =>
+        lines.length ? lines.map((line) => JSON.stringify(line)).join(", ") : "nothing";
+      if (
+        actual.length !== assertion.value.length ||
+        actual.some((line, i) => line !== assertion.value[i])
+      )
+        fail(
+          `The console should show ${list(assertion.value)}, but it showed ${list(actual)}.`,
+        );
+      return;
+    }
+    if (assertion.type === "returns") {
+      const actual = learnerFunction(assertion.fn)(...assertion.args);
+      if (!Object.is(actual, assertion.value))
+        fail(
+          `${assertion.fn}(${assertion.args.map(show).join(", ")}) should return ${show(assertion.value)}, but it returned ${show(actual)}.`,
+        );
+      return;
+    }
     const elements = select(assertion.selector);
     const expected = assertion.value;
     const quoted = (value) => JSON.stringify(String(value));
@@ -278,6 +327,13 @@ function sandboxBootstrap(configuration) {
       assertAll(action.assertions);
       return;
     }
+    if (action.type === "call") {
+      // A logs check after a call looks only at what this call printed.
+      logStart = logs.length;
+      learnerFunction(action.fn)(...action.args);
+      if (runtimeError) fail(runtimeError);
+      return;
+    }
     const element = select(action.selector)[0];
     if (!element)
       fail(
@@ -312,20 +368,36 @@ function sandboxBootstrap(configuration) {
       configurable: true,
       value: guard,
     });
+    Object.defineProperty(window, exposeSlot, {
+      configurable: true,
+      value: (functions) => {
+        exported = functions;
+      },
+    });
+    const names = [
+      ...new Set(
+        [...(test.steps || []), ...(test.assertions || [])]
+          .flatMap((item) => [item, ...(item.assertions || [])])
+          .filter((item) => item.fn)
+          .map((item) => item.fn),
+      ),
+    ];
     const script = document.createElement("script");
     script.nonce = nonce;
     script.textContent =
-      `(function(${guardName}) {\n` +
+      `(function(${guardName}, ${guardName}_expose) {\n` +
       `delete window[${JSON.stringify(guardSlot)}];\n` +
+      `delete window[${JSON.stringify(exposeSlot)}];\n` +
       'document.currentScript.removeAttribute("nonce");\n' +
       'document.currentScript.textContent = "";\n' +
       "document.currentScript.remove();\n" +
       `${guardName}();\n` +
-      `(function() {\n${code}\n}).call(window);\n` +
-      `})(window[${JSON.stringify(guardSlot)}]);`;
+      `(function() {\n${code}\n;${guardName}_expose({${names.map((name) => `${name}: typeof ${name} === "function" ? ${name} : undefined`).join(", ")}});\n}).call(window);\n` +
+      `})(window[${JSON.stringify(guardSlot)}], window[${JSON.stringify(exposeSlot)}]);`;
     appendChild.call(document.body, script);
     if (script.parentNode) removeChild.call(script.parentNode, script);
     delete window[guardSlot];
+    delete window[exposeSlot];
 
     // Also support the conventional $(function () { ... }) ready wrapper.
     // jQuery queues ready callbacks; allow them to settle before interacting.
@@ -335,6 +407,8 @@ function sandboxBootstrap(configuration) {
         return;
       }
       try {
+        // A fresh budget for the tests: a background tab can delay this timer past the first one.
+        deadline = nativeNow() + 800;
         for (const action of test.steps || []) step(action);
         assertAll(test.assertions);
         if (runtimeError) finish(false, runtimeError);
@@ -402,11 +476,17 @@ function runCheck(lesson, code, test, guardName) {
       )
         return;
       if (data.error !== null && typeof data.error !== "string") return;
+      if (
+        !Array.isArray(data.logs) ||
+        !data.logs.every((line) => typeof line === "string")
+      )
+        return;
       finish({
         passed: data.passed,
         detail: data.detail,
         error: data.error,
         html: data.html,
+        logs: data.logs,
       });
     }
 
@@ -481,13 +561,19 @@ export async function runExercise(lesson, code) {
       })),
       error: detail,
       html: lesson.html,
+      logs: [],
     };
   }
 
-  const results = await Promise.all(
-    lesson.tests.map((test) => runCheck(lesson, instrumented, test, guardName)),
+  // Console quests also run once with no test driving them, so the console
+  // shows exactly what the learner's own code printed.
+  const [ownRun, ...results] = await Promise.all(
+    [lesson.console ? {} : null, ...lesson.tests].map(
+      (test) => test && runCheck(lesson, instrumented, test, guardName),
+    ),
   );
   return {
+    logs: ownRun?.logs || [],
     tests: results.map((result, index) => ({
       label: lesson.tests[index].label,
       passed: result.passed,

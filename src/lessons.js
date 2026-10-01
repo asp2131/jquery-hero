@@ -1,4 +1,5 @@
-// The runner checks observable DOM state, never a particular spelling of a solution.
+// The runner checks observable state (the DOM, the console, return values),
+// never a particular spelling of a solution.
 const text = (selector, value) => ({ type: "text", selector, value });
 const count = (selector, value) => ({ type: "count", selector, value });
 const css = (selector, property, value) => ({
@@ -31,6 +32,10 @@ const event = (selector, name, key, which) => ({
   which,
 });
 const times = (n, action) => Array(n).fill(action);
+// Console quests: what was logged, and what a learner's function returns.
+const logs = (...lines) => ({ type: "logs", value: lines });
+const returns = (fn, args, value) => ({ type: "returns", fn, args, value });
+const call = (fn, ...args) => ({ type: "call", fn, args });
 const test = (label, assertions, options = {}) => ({
   label,
   assertions,
@@ -740,323 +745,237 @@ export const lessons = [
       ),
     ],
   },
+  // Advanced Conditionals quests are plain JavaScript, like the lecture's examples:
+  // the tests call the learner's functions and read the console. No jQuery.
   {
     id: 12,
-    title: "Steer the hero",
+    title: "Guests only",
     chapter: "Dungeon gate",
-    concept: "Conditional chains & keydown",
+    concept: "The ! (NOT) operator",
+    console: true,
     description:
-      "The hero takes orders from the arrow keys. Read which key was pressed and call out the direction. Any other key is unsupported.",
+      "The dungeon gate opens for guests: anyone who is not an admin. Use ! to flip the user's isAdmin boolean.",
     objectives: [
-      "On keydown, set #hero to Left, Up, Right, or Down for keys 37, 38, 39, and 40.",
-      "Set #hero to Unsupported for any other key.",
-      "Keep #hero reading Waiting until a key is pressed.",
+      "isGuest(user) returns true when user.isAdmin is false.",
+      "It returns false when user.isAdmin is true.",
     ],
     steps: [
-      'Inside handleKeyDown, start the chain with if (event.which === 37) and set #hero to "Left".',
-      'Add else if branches for 38 ("Up"), 39 ("Right"), and 40 ("Down").',
-      'Finish with an else that sets "Unsupported". Keep the $(document).on("keydown", handleKeyDown) line. Run spell: the tests press keys for you.',
+      "Try it out first: add console.log(!true); and console.log(!false); and run to see them in the console tab.",
+      "Inside isGuest, return !user.isAdmin;",
+      "Run spell: the tests try an admin and a guest.",
     ],
-    syntax:
-      "if (event.which === 37) {\n  // runs for key 37\n} else if (event.which === 38) {\n  // runs for key 38\n} else {\n  // runs when nothing above was true\n}",
+    syntax: "console.log(!true); // false\nconsole.log(!false); // true",
     explanation:
-      "An if starts a conditional chain, and each else if adds another (condition). JavaScript checks them from top to bottom and runs only the first branch whose condition is true. If none are true, the else runs. A keydown handler receives an event object; event.which is the number of the key: 37 is left, 38 up, 39 right, and 40 down.",
+      "Logical operators act on boolean expressions and resolve to a new boolean. ! (NOT) flips one boolean: !true is false and !false is true. Because !user.isAdmin is already true or false, you can return it directly; no if is needed.",
     starter:
-      '// When any key is pressed, run handleKeyDown. If the key is 37, set\n// the hero\'s text to "Left"; 38 is "Up", 39 is "Right", and 40 is\n// "Down". Any other key sets it to "Unsupported".\nfunction handleKeyDown(event) {\n\n}\n\n$(document).on("keydown", handleKeyDown);',
-    html: '<section id="battle"><p id="hero">Waiting</p><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
-    scene: [
-      ["#hero", "hero", [[2, 4]]],
-      [
-        ".goblin",
-        "goblin",
-        [
-          [5, 1],
-          [6, 3],
-        ],
-      ],
-    ],
-    hints: [
-      "The handler's event parameter holds the key number: event.which.",
-      "Compare with ===, for example event.which === 38.",
-      "Only the final else has no (condition).",
-    ],
-    solution:
-      'function handleKeyDown(event) {\n  if (event.which === 37) {\n    $("#hero").text("Left");\n  } else if (event.which === 38) {\n    $("#hero").text("Up");\n  } else if (event.which === 39) {\n    $("#hero").text("Right");\n  } else if (event.which === 40) {\n    $("#hero").text("Down");\n  } else {\n    $("#hero").text("Unsupported");\n  }\n}\n\n$(document).on("keydown", handleKeyDown);',
-    reward: 20,
-    source:
-      "Lecture: Advanced Conditionals — slide 2, Review: conditional chains",
-    tests: [
-      test("The hero waits for a key", [text("#hero", "Waiting")]),
-      ...[
-        [37, "Left"],
-        [38, "Up"],
-        [39, "Right"],
-        [40, "Down"],
-      ].map(([which, direction]) =>
-        test(`Key ${which} reads ${direction}`, [text("#hero", direction)], {
-          steps: [event("#battle", "keydown", `Arrow${direction}`, which)],
-        }),
-      ),
-      test("Other keys are unsupported", [text("#hero", "Unsupported")], {
-        steps: [event("#battle", "keydown", "a", 65)],
-      }),
-      test("Every key press is checked again", [text("#hero", "Left")], {
-        steps: [
-          event("#battle", "keydown", "ArrowRight", 39),
-          check(text("#hero", "Right")),
-          event("#battle", "keydown", "a", 65),
-          check(text("#hero", "Unsupported")),
-          event("#battle", "keydown", "ArrowLeft", 37),
-        ],
-      }),
-    ],
-  },
-  {
-    id: 13,
-    title: "Check your health",
-    chapter: "Dungeon gate",
-    concept: "Chain order & comparison operators",
-    description:
-      "Every goblin hit takes 10 HP. Show the hero's condition after each hit. Order matters: only the first true condition runs.",
-    objectives: [
-      "On each #hit click, lower hp by 10 and show it in #hp (already written).",
-      "Set #hero to Defeated at 0 or less, Critical below 30, Wounded below 70, and Healthy otherwise.",
-      "Keep #hero reading Healthy and #hp reading 100 before the first hit.",
-    ],
-    steps: [
-      'Below $("#hp").text(hp), start the chain with if (hp <= 0) and set #hero to "Defeated".',
-      'Add else if (hp < 30) for "Critical", then else if (hp < 70) for "Wounded".',
-      'End with else for "Healthy". Run spell: the tests let the goblin hit you.',
-    ],
-    syntax:
-      'if (score >= 90) {\n  grade = "A";\n} else if (score >= 80) {\n  grade = "B";\n} else {\n  grade = "C";\n}',
-    explanation:
-      "Comparison operators (>, >=, <, <=, ===, !==) are boolean expressions: each one resolves to true or false. In a chain, order matters. 0 is also below 30 and below 70, so the Defeated check must come first; the first true condition wins and the rest are skipped. 70 is not < 70, so 70 HP still counts as Healthy.",
-    starter:
-      '// Start hp at 100. When #hit is clicked, lower hp by 10 and show it\n// in #hp. Then set the hero\'s text to "Defeated" at 0 or less,\n// "Critical" below 30, "Wounded" below 70, and "Healthy" otherwise.\nlet hp = 100;\n\nfunction takeHit() {\n  hp -= 10;\n  $("#hp").text(hp);\n\n}\n\n$("#hit").on("click", takeHit);',
-    html: '<section id="battle"><p id="hero">Healthy</p><p>HP: <span id="hp">100</span></p><button id="hit" type="button">Goblin attack</button><p class="goblin">Goblin</p></section>',
-    scene: [
-      ["#hero", "hero", [[2, 4]]],
-      ["#hp", "label", [[2, 6]]],
-      [".goblin", "goblin", [[4, 3]]],
-    ],
-    hints: [
-      "Check the most extreme case first: hp <= 0.",
-      "hp < 30 must come before hp < 70, or 20 HP would read Wounded.",
-      "70 HP is not < 70, so it falls through to the else.",
-    ],
-    solution:
-      'let hp = 100;\n\nfunction takeHit() {\n  hp -= 10;\n  $("#hp").text(hp);\n  if (hp <= 0) {\n    $("#hero").text("Defeated");\n  } else if (hp < 30) {\n    $("#hero").text("Critical");\n  } else if (hp < 70) {\n    $("#hero").text("Wounded");\n  } else {\n    $("#hero").text("Healthy");\n  }\n}\n\n$("#hit").on("click", takeHit);',
-    reward: 20,
-    source:
-      "Lecture: Advanced Conditionals — slides 2–3, conditional chains and comparison operators",
-    tests: [
-      test("The hero starts healthy", [
-        text("#hero", "Healthy"),
-        text("#hp", "100"),
-      ]),
-      test(
-        "70 HP is still Healthy",
-        [text("#hp", "70"), text("#hero", "Healthy")],
-        {
-          steps: times(3, click("#hit")),
-        },
-      ),
-      test("60 HP is Wounded", [text("#hero", "Wounded")], {
-        steps: times(4, click("#hit")),
-      }),
-      test("30 HP is Wounded, 20 HP is Critical", [text("#hero", "Critical")], {
-        steps: [
-          ...times(7, click("#hit")),
-          check(text("#hp", "30"), text("#hero", "Wounded")),
-          click("#hit"),
-        ],
-      }),
-      test(
-        "Below 0 HP stays Defeated",
-        [text("#hp", "-10"), text("#hero", "Defeated")],
-        {
-          steps: times(11, click("#hit")),
-        },
-      ),
-      test("0 HP is Defeated", [text("#hp", "0"), text("#hero", "Defeated")], {
-        steps: times(10, click("#hit")),
-      }),
-    ],
-  },
-  {
-    id: 14,
-    title: "Speak the password",
-    chapter: "Dungeon gate",
-    concept: "Comparing strings: === & !==",
-    description:
-      "The dungeon door opens only for the exact password moonbeam. Anything else, even Moonbeam, is the wrong word.",
-    objectives: [
-      "When #speak is clicked, read #password with .val().",
-      "If the value !== moonbeam, set #door to Wrong word; otherwise set it to Open.",
-      "Keep #door reading Locked until #speak is clicked.",
-    ],
-    steps: [
-      'Inside speak, save the value: const word = $("#password").val();',
-      'Write if (word !== "moonbeam") and set #door to "Wrong word".',
-      'Add an else that sets #door to "Open". Run spell: the tests type passwords for you.',
-    ],
-    syntax:
-      'if (answer !== "yes") {\n  // runs for anything except exactly "yes"\n} else {\n  // runs only for "yes"\n}',
-    explanation:
-      '=== is true only when both sides are exactly the same, and !== is its opposite: true whenever they differ. String comparison is exact, so "Moonbeam", "moonbeam " with a trailing space, and "" are all different from "moonbeam". Read the value inside the handler so each click checks what is typed right now.',
-    starter:
-      '// When #speak is clicked, get the value of the password input. If it\n// is not exactly "moonbeam", set the door\'s text to "Wrong word".\n// Otherwise, set it to "Open".\nfunction speak() {\n\n}\n\n$("#speak").on("click", speak);',
-    html: '<section id="battle"><label>Password <input id="password" value=""></label><button id="speak" type="button">Speak</button><p id="door">Locked</p><p id="hero">Hero</p></section>',
+      '// isGuest receives a user like { name: "John", age: 25, isAdmin: false }\n// and returns true if the user is not an admin, and false if they are.\nfunction isGuest(user) {\n\n}',
+    html: '<section id="battle"><p id="door">Locked</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="door">Open</p><p id="hero">Hero</p></section>',
     scene: [
       ["#door", "gate", [[4, 0]], (el) => el.textContent === "Open"],
       ["#hero", "hero", [[3, 3]]],
     ],
     hints: [
-      'Use $("#password").val() inside the function.',
-      'Compare with !== "moonbeam": lowercase, in quotes.',
-      'The else branch sets "Open".',
+      "The boolean lives on the object: user.isAdmin.",
+      "! goes right before the value: !user.isAdmin.",
+      "return sends the flipped boolean back.",
+    ],
+    solution: "function isGuest(user) {\n  return !user.isAdmin;\n}",
+    reward: 20,
+    source: "Lecture: Advanced Conditionals — slide 4, Logical Operators: !",
+    tests: [
+      test("A user who isn't an admin is a guest", [
+        returns("isGuest", [{ name: "John", age: 25, isAdmin: false }], true),
+      ]),
+      test("An admin is not a guest", [
+        returns("isGuest", [{ name: "Ana", age: 30, isAdmin: true }], false),
+      ]),
+    ],
+  },
+  {
+    id: 13,
+    title: "Cast a spell",
+    chapter: "Dungeon gate",
+    concept: "The && (AND) operator",
+    console: true,
+    description:
+      "A spell needs mana and a wand. Missing either one, and it fizzles.",
+    objectives: [
+      "canCast(hasMana, hasWand) returns true only when both are true.",
+      "It returns false for every other combination.",
+    ],
+    steps: [
+      "Try it out first: console.log(true && false); Predict the answer, then run and check the console tab.",
+      "Inside canCast, return hasMana && hasWand;",
+      "Run spell: the tests try all four combinations.",
+    ],
+    syntax:
+      "console.log(true && true); // true\nconsole.log(true && false); // false\nconsole.log(false && true); // false\nconsole.log(false && false); // false",
+    explanation:
+      "&& (AND) is true only if both sides are true. Out of the four combinations of two booleans, only true && true is true. Read it as \"this and that\".",
+    starter:
+      "// canCast receives two booleans: whether the hero has mana and whether\n// the hero has a wand. It returns true only if the hero has both.\nfunction canCast(hasMana, hasWand) {\n\n}",
+    html: '<section id="battle"><p id="hero">Hero</p><p class="goblin">Goblin</p></section>',
+    won: '<section id="battle"><p id="hero">Spell cast!</p><p class="goblin">Hit!</p></section>',
+    scene: [
+      ["#hero", "hero", [[2, 4]], (el) => el.textContent === "Spell cast!"],
+      [".goblin", "goblin", [[5, 2]], (el) => el.textContent === "Hit!"],
+    ],
+    hints: [
+      "&& goes between the two booleans.",
+      "Both parameters are already booleans; no === true needed.",
+      "return hasMana && hasWand; is the whole function.",
     ],
     solution:
-      'function speak() {\n  const word = $("#password").val();\n  if (word !== "moonbeam") {\n    $("#door").text("Wrong word");\n  } else {\n    $("#door").text("Open");\n  }\n}\n\n$("#speak").on("click", speak);',
+      "function canCast(hasMana, hasWand) {\n  return hasMana && hasWand;\n}",
     reward: 20,
-    source:
-      "Lecture: Advanced Conditionals — slide 3, Boolean Expressions: comparison operators",
+    source: "Lecture: Advanced Conditionals — slide 4, Logical Operators: &&",
     tests: [
-      test("The door waits for a word", [text("#door", "Locked")]),
-      test("A wrong word keeps it shut", [text("#door", "Wrong word")], {
-        steps: [value("#password", "sunbeam"), click("#speak")],
-      }),
-      test("Capitals don't count", [text("#door", "Wrong word")], {
-        steps: [value("#password", "Moonbeam"), click("#speak")],
-      }),
-      test("An empty password is wrong", [text("#door", "Wrong word")], {
-        steps: [click("#speak")],
-      }),
-      test(
-        "Every attempt is checked; moonbeam opens it",
-        [text("#door", "Open")],
-        {
-          steps: [
-            value("#password", "open sesame"),
-            click("#speak"),
-            check(text("#door", "Wrong word")),
-            value("#password", "moonbeam"),
-            click("#speak"),
-          ],
-        },
-      ),
+      test("true && true is true", [returns("canCast", [true, true], true)]),
+      test("true && false is false", [
+        returns("canCast", [true, false], false),
+      ]),
+      test("false && true is false", [
+        returns("canCast", [false, true], false),
+      ]),
+      test("false && false is false", [
+        returns("canCast", [false, false], false),
+      ]),
+    ],
+  },
+  {
+    id: 14,
+    title: "Find a way out",
+    chapter: "Dungeon gate",
+    concept: "The || (OR) operator",
+    console: true,
+    description:
+      "The hero is trapped in a pit. A rope or a key gets them out; either one is enough.",
+    objectives: [
+      "canEscape(hasRope, hasKey) returns true when at least one is true.",
+      "It returns false only when both are false.",
+    ],
+    steps: [
+      "Try it out first: console.log(false || true); Predict the answer, then run and check the console tab.",
+      "Inside canEscape, return hasRope || hasKey;",
+      "Run spell: the tests try all four combinations.",
+    ],
+    syntax:
+      "console.log(true || true); // true\nconsole.log(true || false); // true\nconsole.log(false || true); // true\nconsole.log(false || false); // false",
+    explanation:
+      "|| (OR) is true if at least one side is true. Out of the four combinations of two booleans, only false || false is false. Read it as \"this or that, or both\".",
+    starter:
+      "// canEscape receives two booleans: whether the hero has a rope and\n// whether the hero has a key. It returns true if the hero has at least\n// one of them.\nfunction canEscape(hasRope, hasKey) {\n\n}",
+    html: '<section id="battle"><p id="door">Locked</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="door">Open</p><p id="hero">Free!</p></section>',
+    scene: [
+      ["#door", "gate", [[4, 0]], (el) => el.textContent === "Open"],
+      ["#hero", "hero", [[3, 3]]],
+    ],
+    hints: [
+      "|| is two vertical bars, usually Shift + the backslash key.",
+      "|| goes between the two booleans.",
+      "return hasRope || hasKey; is the whole function.",
+    ],
+    solution:
+      "function canEscape(hasRope, hasKey) {\n  return hasRope || hasKey;\n}",
+    reward: 20,
+    source: "Lecture: Advanced Conditionals — slide 4, Logical Operators: ||",
+    tests: [
+      test("true || true is true", [returns("canEscape", [true, true], true)]),
+      test("true || false is true", [
+        returns("canEscape", [true, false], true),
+      ]),
+      test("false || true is true", [
+        returns("canEscape", [false, true], true),
+      ]),
+      test("false || false is false", [
+        returns("canEscape", [false, false], false),
+      ]),
     ],
   },
   {
     id: 15,
-    title: "Roll to dodge",
+    title: "Hello John",
     chapter: "Treasure vault",
-    concept: "Functions that return booleans",
+    concept: "Combining ! and &&",
+    console: true,
     description:
-      "Goblin archers guard the vault. Every volley, a dodge roll decides whether the hero takes damage.",
+      "The vault keeper greets John, but only when he visits as a regular user, not as an admin. The starter nests one if inside another. Refactor it into a single condition.",
     objectives: [
-      "Make dodgeRoll() return true when Math.random() > 0.5 and false otherwise.",
-      "On each #fire click, if dodgeRoll() is true, set #hero to Dodged!.",
-      "Otherwise set #hero to Ouch!, lower hp by 10, and show it in #hp.",
+      "greet(user) logs hello John when the user is named John and is not an admin.",
+      "It logs nothing for anyone else, including John as an admin.",
+      "Use one if with ! and &&, not two nested ifs.",
     ],
     steps: [
-      "Inside dodgeRoll, write if (Math.random() > 0.5) { return true; } with an else that returns false.",
-      'Inside fireArrows, write if (dodgeRoll()) and set #hero to "Dodged!".',
-      'In the else: set #hero to "Ouch!", then hp -= 10; and $("#hp").text(hp). Run spell.',
+      'Replace the two nested ifs with one: if (!user.isAdmin && user.name === "John").',
+      'Inside it, console.log("hello John");',
+      "Run spell: the tests visit as John and as other users.",
     ],
     syntax:
-      "function isTall(height) {\n  if (height > 180) {\n    return true;\n  } else {\n    return false;\n  }\n}\n\nif (isTall(200)) {\n  // runs, because isTall(200) returned true\n}",
+      'if (!user.isAdmin && user.name === "John") {\n  console.log("hello John");\n}',
     explanation:
-      "A boolean expression doesn't have to be a comparison. A function call that returns true or false works too: if (dodgeRoll()) runs dodgeRoll, then uses the boolean it returns. Keep the () this time: you are calling the function for its answer, not handing it to an event. Call it inside the handler so every volley gets a fresh roll.",
+      "In the slides' code challenge, an if nested inside another if runs only when both conditions are true. That is exactly what && means, so the two ifs become one: !user.isAdmin && user.name === \"John\". The ! flips isAdmin first, then && requires both sides to be true.",
     starter:
-      '// dodgeRoll returns true if a random number is above 0.5 and false\n// otherwise. When #fire is clicked, call dodgeRoll as the condition:\n// if it returns true, set the hero\'s text to "Dodged!". Otherwise,\n// set it to "Ouch!", lower hp by 10, and show it in #hp.\nlet hp = 50;\n\nfunction dodgeRoll() {\n\n}\n\nfunction fireArrows() {\n\n}\n\n$("#fire").on("click", fireArrows);',
-    html: '<section id="battle"><p id="hero">Ready</p><p>HP: <span id="hp">50</span></p><button id="fire" type="button">Goblins fire</button><p class="goblin">Archer</p><p class="goblin">Archer</p></section>',
+      '// greet receives a user like { name: "John", age: 25, isAdmin: false }\n// and logs "hello John" only if the user is John and is not an admin.\nfunction greet(user) {\n  if (!user.isAdmin) {\n    if (user.name === "John") {\n\n    }\n  }\n}',
+    html: '<section id="battle"><p id="keeper">Keeper</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="keeper">hello John</p><p id="hero">John</p></section>',
     scene: [
+      ["#keeper", "villager", [[4, 1]]],
       ["#hero", "hero", [[2, 4]]],
-      ["#hp", "label", [[2, 6]]],
-      [
-        ".goblin",
-        "goblin",
-        [
-          [5, 1],
-          [6, 3],
-        ],
-      ],
     ],
     hints: [
-      "dodgeRoll needs return true; in one branch and return false; in the other.",
-      "if (dodgeRoll()) calls the function, so keep the parentheses there.",
-      "Only the else branch lowers hp.",
+      "A nested if is the same as joining both conditions with &&.",
+      "! goes before user.isAdmin.",
+      '"John" is a string, so compare with === and quotes.',
     ],
     solution:
-      'let hp = 50;\n\nfunction dodgeRoll() {\n  if (Math.random() > 0.5) {\n    return true;\n  } else {\n    return false;\n  }\n}\n\nfunction fireArrows() {\n  if (dodgeRoll()) {\n    $("#hero").text("Dodged!");\n  } else {\n    $("#hero").text("Ouch!");\n    hp -= 10;\n    $("#hp").text(hp);\n  }\n}\n\n$("#fire").on("click", fireArrows);',
+      'function greet(user) {\n  if (!user.isAdmin && user.name === "John") {\n    console.log("hello John");\n  }\n}',
     reward: 20,
     source:
-      "Lecture: Advanced Conditionals — slide 3, Boolean Expressions: function calls",
+      "Lecture: Advanced Conditionals — slides 5–6, Code Challenge: refactor with ! and &&",
     tests: [
-      test("Nothing fires before a click", [
-        text("#hero", "Ready"),
-        text("#hp", "50"),
-      ]),
-      test(
-        "A high roll dodges",
-        [text("#hero", "Dodged!"), text("#hp", "50")],
-        {
-          random: [0.9],
-          steps: [click("#fire")],
-        },
-      ),
-      test("A low roll hurts", [text("#hero", "Ouch!"), text("#hp", "40")], {
-        random: [0.1],
-        steps: [click("#fire")],
+      test("John as a regular user is greeted", [logs("hello John")], {
+        steps: [call("greet", { name: "John", age: 25, isAdmin: false })],
       }),
-      test("Exactly 0.5 is not a dodge", [text("#hero", "Ouch!")], {
-        random: [0.5],
-        steps: [click("#fire")],
+      test("John as an admin is not", [logs()], {
+        steps: [call("greet", { name: "John", age: 25, isAdmin: true })],
       }),
-      test(
-        "Every volley rolls again",
-        [text("#hero", "Dodged!"), text("#hp", "30")],
-        {
-          random: [0.1, 0.2, 0.9],
-          steps: [
-            click("#fire"),
-            check(text("#hero", "Ouch!"), text("#hp", "40")),
-            click("#fire"),
-            check(text("#hero", "Ouch!"), text("#hp", "30")),
-            click("#fire"),
-          ],
-        },
-      ),
+      test("Someone else is not", [logs()], {
+        steps: [call("greet", { name: "Ana", age: 30, isAdmin: false })],
+      }),
+      test("An admin who isn't John is not", [logs()], {
+        steps: [call("greet", { name: "Ana", age: 30, isAdmin: true })],
+      }),
     ],
   },
   {
     id: 16,
     title: "Raise the shield",
     chapter: "Treasure vault",
-    concept: "Boolean variables & the ! operator",
+    concept: "Boolean values & the ! operator",
+    console: true,
     description:
-      "One button raises and lowers the hero's shield. A boolean variable remembers which one it is.",
+      "A goblin swings at the hero. A raised shield blocks it. The hero object remembers whether the shield is up with a boolean.",
     objectives: [
-      "On each #shield click, flip shieldUp with the ! operator.",
-      "If shieldUp is true, add the shielded class to #hero and set its text to Shield up.",
-      "Otherwise remove the shielded class and set its text to Shield down.",
+      "blockAttack(hero) returns Blocked when hero.shieldUp is true and Ouch! when it is false.",
+      "toggleShield(shieldUp) returns the opposite boolean, using the ! operator.",
     ],
     steps: [
-      "Inside toggleShield, first write shieldUp = !shieldUp; to flip the boolean.",
-      'Then if (shieldUp): call .addClass("shielded") and .text("Shield up") on #hero.',
-      'In the else: .removeClass("shielded") and .text("Shield down"). Run spell.',
+      'In blockAttack, write if (hero.shieldUp) and return "Blocked". It is already a boolean, so no === true is needed.',
+      'Add an else that returns "Ouch!".',
+      "In toggleShield, return !shieldUp; Try console.log(!true); to watch ! flip a boolean.",
     ],
     syntax:
-      "let isOpen = false;\nisOpen = !isOpen; // now true\n\nif (isOpen) {\n  // runs when isOpen is true\n}",
+      'const user = { isAdmin: false };\n\nif (user.isAdmin) {\n  // runs only when isAdmin is true\n}\n\nconsole.log(!true); // false',
     explanation:
-      "A variable can hold a boolean value: true or false. if (shieldUp) needs no comparison, because shieldUp is already a boolean. The ! (NOT) operator flips a boolean: !true is false and !false is true. Writing shieldUp = !shieldUp; turns one button into a toggle.",
+      "A boolean expression can be a plain boolean value, like user.isAdmin from the slides. if (hero.shieldUp) needs no comparison, because shieldUp is already true or false. The ! (NOT) operator flips a boolean: !true is false and !false is true.",
     starter:
-      '// shieldUp starts as false. When #shield is clicked, flip it with the\n// ! operator. If shieldUp is true, add the shielded class to the hero\n// and set its text to "Shield up". Otherwise, remove the shielded\n// class and set its text to "Shield down".\nlet shieldUp = false;\n\nfunction toggleShield() {\n\n}\n\n$("#shield").on("click", toggleShield);',
-    html: '<section id="battle"><p id="hero">Shield down</p><button id="shield" type="button">Shield</button><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
+      '// Each hero object has a shieldUp boolean, like { shieldUp: true }.\n// blockAttack returns "Blocked" when the shield is up and "Ouch!" when\n// it is down. toggleShield returns the opposite of the boolean it gets.\nfunction blockAttack(hero) {\n\n}\n\nfunction toggleShield(shieldUp) {\n\n}',
+    html: '<section id="battle"><p id="hero">Shield down</p><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
+    won: '<section id="battle"><p id="hero">Shield up</p><p class="goblin">Goblin</p><p class="goblin">Goblin</p></section>',
     scene: [
-      ["#hero", "hero", [[2, 4]]],
+      ["#hero", "hero", [[2, 4]], (el) => el.textContent === "Shield up"],
       [
         ".goblin",
         "goblin",
@@ -1067,42 +986,28 @@ export const lessons = [
       ],
     ],
     hints: [
-      "shieldUp = !shieldUp; goes first inside the function.",
-      "if (shieldUp) works without === true.",
-      'Class names go without a dot: .addClass("shielded").',
+      "Read the boolean with hero.shieldUp.",
+      "if (hero.shieldUp) works without === true.",
+      "! goes right before the value: !shieldUp.",
     ],
     solution:
-      'let shieldUp = false;\n\nfunction toggleShield() {\n  shieldUp = !shieldUp;\n  if (shieldUp) {\n    $("#hero").addClass("shielded").text("Shield up");\n  } else {\n    $("#hero").removeClass("shielded").text("Shield down");\n  }\n}\n\n$("#shield").on("click", toggleShield);',
+      'function blockAttack(hero) {\n  if (hero.shieldUp) {\n    return "Blocked";\n  } else {\n    return "Ouch!";\n  }\n}\n\nfunction toggleShield(shieldUp) {\n  return !shieldUp;\n}',
     reward: 20,
     source:
       "Lecture: Advanced Conditionals — slides 3–4, constant booleans and the ! operator",
     tests: [
-      test("The shield starts down", [
-        text("#hero", "Shield down"),
-        hasClass("#hero", "shielded", false),
+      test("A raised shield blocks", [
+        returns("blockAttack", [{ shieldUp: true }], "Blocked"),
       ]),
-      test(
-        "One click raises it",
-        [text("#hero", "Shield up"), hasClass("#hero", "shielded")],
-        { steps: [click("#shield")] },
-      ),
-      test(
-        "A second click lowers it",
-        [text("#hero", "Shield down"), hasClass("#hero", "shielded", false)],
-        { steps: times(2, click("#shield")) },
-      ),
-      test(
-        "It keeps toggling",
-        [text("#hero", "Shield up"), hasClass("#hero", "shielded")],
-        {
-          steps: [
-            click("#shield"),
-            click("#shield"),
-            check(hasClass("#hero", "shielded", false)),
-            click("#shield"),
-          ],
-        },
-      ),
+      test("A lowered shield doesn't", [
+        returns("blockAttack", [{ shieldUp: false }], "Ouch!"),
+      ]),
+      test("! lowers a raised shield", [
+        returns("toggleShield", [true], false),
+      ]),
+      test("! raises a lowered shield", [
+        returns("toggleShield", [false], true),
+      ]),
     ],
   },
   {
@@ -1110,53 +1015,57 @@ export const lessons = [
     title: "Open the vault",
     chapter: "Treasure vault",
     concept: "The && (AND) operator",
+    console: true,
     description:
       "The treasure vault has two locks. It opens only when the hero holds the red key and the blue key.",
     objectives: [
-      "When #open is clicked, set #vault to Open only if hasRedKey && hasBlueKey.",
-      "Otherwise set #vault to Locked.",
-      "Leave the key buttons working as given.",
+      "openVault(hero) returns Open only if hero.hasRedKey && hero.hasBlueKey.",
+      "Otherwise it returns Locked.",
     ],
     steps: [
-      "Inside openVault, write if (hasRedKey && hasBlueKey).",
-      'Set #vault to "Open" in that branch and "Locked" in the else.',
-      "Leave the key functions and .on() lines as they are. Run spell: the tests pick up keys for you.",
+      "Inside openVault, write if (hero.hasRedKey && hero.hasBlueKey).",
+      'Return "Open" inside the if, and "Locked" in an else.',
+      "Run spell: the tests try every mix of keys.",
     ],
     syntax:
       "if (hasTicket && hasSeat) {\n  // runs only when both are true\n} else {\n  // runs when either one is false\n}",
     explanation:
       "Logical operators act on boolean expressions and resolve to a new boolean. && (AND) is true only when both sides are true: true && true is true, while true && false, false && true, and false && false are all false. One key is not enough.",
     starter:
-      '// Clicking a key button picks up that key. When #open is clicked, if\n// the hero has the red key AND the blue key, set the vault\'s text to\n// "Open". Otherwise, set it to "Locked".\nlet hasRedKey = false;\nlet hasBlueKey = false;\n\nfunction takeRedKey() {\n  hasRedKey = true;\n  $("#red-key").text("Taken");\n}\n\nfunction takeBlueKey() {\n  hasBlueKey = true;\n  $("#blue-key").text("Taken");\n}\n\nfunction openVault() {\n\n}\n\n$("#red-key").on("click", takeRedKey);\n$("#blue-key").on("click", takeBlueKey);\n$("#open").on("click", openVault);',
-    html: '<section id="battle"><button id="red-key" type="button">Red key</button><button id="blue-key" type="button">Blue key</button><button id="open" type="button">Open vault</button><p id="vault">Sealed</p></section>',
+      '// Each hero object has two booleans: hasRedKey and hasBlueKey.\n// openVault returns "Open" only when the hero has both keys, and\n// "Locked" otherwise.\nfunction openVault(hero) {\n\n}',
+    html: '<section id="battle"><p id="vault">Sealed</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="vault">Open</p><p id="hero">Hero</p></section>',
     scene: [
       ["#vault", "gate", [[4, 0]], (el) => el.textContent === "Open"],
-      ["#red-key", "label", [[1, 2]]],
-      ["#blue-key", "label", [[3, 2]]],
+      ["#hero", "hero", [[3, 3]]],
     ],
     hints: [
-      "Both variables already exist: hasRedKey and hasBlueKey.",
+      "Both keys live on the hero object: hero.hasRedKey and hero.hasBlueKey.",
       "&& sits between the two conditions inside one pair of parentheses.",
       "The else covers every other case.",
     ],
     solution:
-      'let hasRedKey = false;\nlet hasBlueKey = false;\n\nfunction takeRedKey() {\n  hasRedKey = true;\n  $("#red-key").text("Taken");\n}\n\nfunction takeBlueKey() {\n  hasBlueKey = true;\n  $("#blue-key").text("Taken");\n}\n\nfunction openVault() {\n  if (hasRedKey && hasBlueKey) {\n    $("#vault").text("Open");\n  } else {\n    $("#vault").text("Locked");\n  }\n}\n\n$("#red-key").on("click", takeRedKey);\n$("#blue-key").on("click", takeBlueKey);\n$("#open").on("click", openVault);',
+      'function openVault(hero) {\n  if (hero.hasRedKey && hero.hasBlueKey) {\n    return "Open";\n  } else {\n    return "Locked";\n  }\n}',
     reward: 20,
     source:
       "Lecture: Advanced Conditionals — slides 4 and 6, Logical Operators: &&",
     tests: [
-      test("No keys: the vault stays locked", [text("#vault", "Locked")], {
-        steps: [click("#open")],
-      }),
-      test("The red key alone is not enough", [text("#vault", "Locked")], {
-        steps: [click("#red-key"), click("#open")],
-      }),
-      test("The blue key alone is not enough", [text("#vault", "Locked")], {
-        steps: [click("#blue-key"), click("#open")],
-      }),
-      test("Both keys open the vault", [text("#vault", "Open")], {
-        steps: [click("#red-key"), click("#blue-key"), click("#open")],
-      }),
+      test("No keys: locked", [
+        returns(
+          "openVault",
+          [{ hasRedKey: false, hasBlueKey: false }],
+          "Locked",
+        ),
+      ]),
+      test("Red key alone: locked", [
+        returns("openVault", [{ hasRedKey: true, hasBlueKey: false }], "Locked"),
+      ]),
+      test("Blue key alone: locked", [
+        returns("openVault", [{ hasRedKey: false, hasBlueKey: true }], "Locked"),
+      ]),
+      test("Both keys: open", [
+        returns("openVault", [{ hasRedKey: true, hasBlueKey: true }], "Open"),
+      ]),
     ],
   },
   {
@@ -1164,120 +1073,108 @@ export const lessons = [
     title: "Enter the guild",
     chapter: "Guild hall",
     concept: "The || (OR) operator",
+    console: true,
     description:
-      "The guild guard lets in anyone level 5 or higher, or anyone wearing a guild badge. Either one is enough.",
+      "The guild guard lets in adults and admins. The starter checks this with an if and an else if that do the same thing. Refactor them into one condition, and turn everyone else away.",
     objectives: [
-      "When #enter is clicked, set #guard to Welcome if level >= 5 || hasBadge.",
-      "Otherwise set #guard to Go away.",
-      "Leave the training and badge buttons working as given.",
+      "checkAccess(user) logs access granted if user.age >= 18 || user.isAdmin.",
+      "Otherwise it logs access denied.",
+      "Each call logs exactly one line.",
     ],
     steps: [
-      "Inside enterGuild, write if (level >= 5 || hasBadge).",
-      'Set #guard to "Welcome" in that branch and "Go away" in the else.',
-      "Leave train, takeBadge, and the .on() lines as given. Run spell.",
+      "Combine the two conditions into one: if (user.age >= 18 || user.isAdmin).",
+      'Keep one console.log("access granted") inside it and delete the else if.',
+      'Add an else that logs "access denied". Run spell.',
     ],
     syntax:
       "if (isWeekend || isHoliday) {\n  // runs when at least one is true\n} else {\n  // runs only when both are false\n}",
     explanation:
-      "|| (OR) is true when at least one side is true; it is false only when both sides are false. In the slides, if (user.age >= 18 || user.isAdmin) replaces an if and an else if that did the same thing. A comparison like level >= 5 and a boolean like hasBadge can sit on either side.",
+      "|| (OR) is true when at least one side is true; it is false only when both sides are false. In the slides' code challenge, if (user.age >= 18 || user.isAdmin) replaces an if and an else if that did the same thing. A comparison like user.age >= 18 and a boolean like user.isAdmin can sit on either side.",
     starter:
-      '// Training raises the hero\'s level, and the badge button gives a\n// badge. When #enter is clicked, if the level is 5 or more OR the hero\n// has a badge, set the guard\'s text to "Welcome". Otherwise, set it to\n// "Go away".\nlet level = 1;\nlet hasBadge = false;\n\nfunction train() {\n  level += 1;\n  $("#level").text(level);\n}\n\nfunction takeBadge() {\n  hasBadge = true;\n  $("#badge").text("Badge worn");\n}\n\nfunction enterGuild() {\n\n}\n\n$("#train").on("click", train);\n$("#badge").on("click", takeBadge);\n$("#enter").on("click", enterGuild);',
-    html: '<section id="battle"><p>Level: <span id="level">1</span></p><button id="train" type="button">Train</button><button id="badge" type="button">Take badge</button><button id="enter" type="button">Enter guild</button><p id="guard">Halt</p></section>',
+      '// checkAccess receives a user like { name: "John", age: 25, isAdmin: false }\n// and logs "access granted" for adults (18 or older) and admins, and\n// "access denied" for everyone else.\nfunction checkAccess(user) {\n  if (user.age >= 18) {\n    console.log("access granted");\n  } else if (user.isAdmin) {\n    console.log("access granted");\n  }\n}',
+    html: '<section id="battle"><p id="guard">Halt</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="guard">Welcome</p><p id="hero">Hero</p></section>',
     scene: [
       ["#guard", "villager", [[4, 1]]],
-      ["#level", "label", [[2, 6]]],
+      ["#hero", "hero", [[2, 4]]],
     ],
     hints: [
-      "Use >= so level 5 counts.",
+      "Use >= so an 18-year-old counts.",
       "|| goes between the two conditions.",
-      "hasBadge is already a boolean; no === true needed.",
+      "user.isAdmin is already a boolean; no === true needed.",
     ],
     solution:
-      'let level = 1;\nlet hasBadge = false;\n\nfunction train() {\n  level += 1;\n  $("#level").text(level);\n}\n\nfunction takeBadge() {\n  hasBadge = true;\n  $("#badge").text("Badge worn");\n}\n\nfunction enterGuild() {\n  if (level >= 5 || hasBadge) {\n    $("#guard").text("Welcome");\n  } else {\n    $("#guard").text("Go away");\n  }\n}\n\n$("#train").on("click", train);\n$("#badge").on("click", takeBadge);\n$("#enter").on("click", enterGuild);',
+      'function checkAccess(user) {\n  if (user.age >= 18 || user.isAdmin) {\n    console.log("access granted");\n  } else {\n    console.log("access denied");\n  }\n}',
     reward: 20,
     source:
       "Lecture: Advanced Conditionals — slides 5–6, Code Challenge: refactor with ||",
     tests: [
-      test(
-        "Level 1 without a badge is turned away",
-        [text("#guard", "Go away")],
-        {
-          steps: [click("#enter")],
-        },
-      ),
-      test(
-        "Level 4 is still too low",
-        [text("#level", "4"), text("#guard", "Go away")],
-        {
-          steps: [...times(3, click("#train")), click("#enter")],
-        },
-      ),
-      test("A badge is enough at level 1", [text("#guard", "Welcome")], {
-        steps: [click("#badge"), click("#enter")],
+      test("An adult gets in", [logs("access granted")], {
+        steps: [call("checkAccess", { name: "John", age: 25, isAdmin: false })],
       }),
-      test(
-        "Level 5 is enough without a badge",
-        [text("#level", "5"), text("#guard", "Welcome")],
-        {
-          steps: [...times(4, click("#train")), click("#enter")],
-        },
-      ),
+      test("Exactly 18 gets in", [logs("access granted")], {
+        steps: [call("checkAccess", { name: "Ana", age: 18, isAdmin: false })],
+      }),
+      test("A young admin gets in", [logs("access granted")], {
+        steps: [call("checkAccess", { name: "Kai", age: 16, isAdmin: true })],
+      }),
+      test("Everyone else is denied", [logs("access denied")], {
+        steps: [call("checkAccess", { name: "Kai", age: 16, isAdmin: false })],
+      }),
     ],
   },
   {
     id: 19,
-    title: "The boss door",
+    title: "Four guild doors",
     chapter: "Guild hall",
     concept: "Combining &&, || & parentheses",
+    console: true,
     description:
-      "The goblin king's door needs the boss key, plus either level 5 or a guild badge. The key alone isn't enough, and neither is a badge without the key.",
+      "The guild hall has four doors, A to D, each with its own rule. Log the letter of every door a user may pass. More than one can open.",
     objectives: [
-      "When #open is clicked, set #door to Open if hasKey && (level >= 5 || hasBadge).",
-      "Otherwise set #door to Sealed.",
-      "Leave the training, badge, and key buttons working as given.",
+      "checkDoors(user) logs A if the user is not an admin.",
+      "It logs B if the user is an admin or 18 or older, and C if the user is named John and is an admin.",
+      "It logs D if the user is named John and is either an admin or 18 or older.",
     ],
     steps: [
-      "Inside openDoor, write if (hasKey && (level >= 5 || hasBadge)).",
-      "The inner parentheses turn the || part into one boolean before && joins it with hasKey.",
-      'Set #door to "Open" in the if and "Sealed" in the else. Run spell.',
+      "Write four separate if statements, not a chain: more than one door can open.",
+      'A is if (!user.isAdmin), B uses ||, and C uses &&. Each one logs its letter, like console.log("A").',
+      'D is user.name === "John" && (user.isAdmin || user.age >= 18). Keep the parentheses. Run spell.',
     ],
     syntax:
       "if (hasTicket && (age >= 18 || withAdult)) {\n  // a ticket, plus at least one of the others\n}",
     explanation:
-      "As in math, parentheses decide what is worked out first. In hasKey && (level >= 5 || hasBadge), the || resolves first, then && also requires the key. Without the parentheses, && goes before ||, so hasKey && level >= 5 || hasBadge would open for a badge alone. This is answer D from the slides' A, B, C, and or D puzzle.",
+      "As in math, parentheses decide what is worked out first. In D, the || resolves first, then && also requires the name John. Without the parentheses, && goes before ||, so anyone 18 or older would pass D. Separate if statements are each checked, unlike a chain, which is why the slides' John (25, not an admin) gets A, B, and D.",
     starter:
-      '// Opening the door needs the boss key AND either level 5 or more OR a\n// badge. When #open is clicked, if all that is true, set the door\'s\n// text to "Open". Otherwise, set it to "Sealed".\nlet level = 1;\nlet hasBadge = false;\nlet hasKey = false;\n\nfunction train() {\n  level += 1;\n  $("#level").text(level);\n}\n\nfunction takeBadge() {\n  hasBadge = true;\n  $("#badge").text("Badge worn");\n}\n\nfunction takeKey() {\n  hasKey = true;\n  $("#key").text("Key taken");\n}\n\nfunction openDoor() {\n\n}\n\n$("#train").on("click", train);\n$("#badge").on("click", takeBadge);\n$("#key").on("click", takeKey);\n$("#open").on("click", openDoor);',
-    html: '<section id="battle"><p>Level: <span id="level">1</span></p><button id="train" type="button">Train</button><button id="badge" type="button">Take badge</button><button id="key" type="button">Boss key</button><button id="open" type="button">Open door</button><p id="door">Closed</p><p id="boss">Goblin king</p></section>',
+      '// checkDoors receives a user like { name: "John", age: 25, isAdmin: false }\n// and logs the letter of every door the user may pass, in order:\n// A for non-admins, B for admins or anyone 18 or older, C for an admin\n// named John, and D for John if he is an admin or 18 or older.\nfunction checkDoors(user) {\n\n}',
+    html: '<section id="battle"><p id="door">Closed</p><p id="boss">Goblin king</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="door">Open</p><p id="boss">Goblin king</p><p id="hero">Hero</p></section>',
     scene: [
       ["#door", "gate", [[4, 0]], (el) => el.textContent === "Open"],
       ["#boss", "boss", [[5, 2]]],
-      ["#key", "label", [[1, 2]]],
-      ["#level", "label", [[2, 6]]],
+      ["#hero", "hero", [[2, 4]]],
     ],
     hints: [
-      "Start the condition with hasKey &&.",
-      "Wrap level >= 5 || hasBadge in its own parentheses.",
-      'The else sets "Sealed".',
+      "Four ifs, no else: each door is checked on its own.",
+      "! goes before user.isAdmin for door A.",
+      "Wrap user.isAdmin || user.age >= 18 in its own parentheses for D.",
     ],
     solution:
-      'let level = 1;\nlet hasBadge = false;\nlet hasKey = false;\n\nfunction train() {\n  level += 1;\n  $("#level").text(level);\n}\n\nfunction takeBadge() {\n  hasBadge = true;\n  $("#badge").text("Badge worn");\n}\n\nfunction takeKey() {\n  hasKey = true;\n  $("#key").text("Key taken");\n}\n\nfunction openDoor() {\n  if (hasKey && (level >= 5 || hasBadge)) {\n    $("#door").text("Open");\n  } else {\n    $("#door").text("Sealed");\n  }\n}\n\n$("#train").on("click", train);\n$("#badge").on("click", takeBadge);\n$("#key").on("click", takeKey);\n$("#open").on("click", openDoor);',
+      'function checkDoors(user) {\n  if (!user.isAdmin) {\n    console.log("A");\n  }\n  if (user.isAdmin || user.age >= 18) {\n    console.log("B");\n  }\n  if (user.name === "John" && user.isAdmin) {\n    console.log("C");\n  }\n  if (user.name === "John" && (user.isAdmin || user.age >= 18)) {\n    console.log("D");\n  }\n}',
     reward: 20,
     source: "Lecture: Advanced Conditionals — slides 7–8, A, B, C and or D?",
     tests: [
-      test("The key alone is not enough", [text("#door", "Sealed")], {
-        steps: [click("#key"), click("#open")],
+      test("The slides' John gets A, B, and D", [logs("A", "B", "D")], {
+        steps: [call("checkDoors", { name: "John", age: 25, isAdmin: false })],
       }),
-      test("A badge without the key is not enough", [text("#door", "Sealed")], {
-        steps: [click("#badge"), click("#open")],
+      test("Young admin John gets B, C, and D", [logs("B", "C", "D")], {
+        steps: [call("checkDoors", { name: "John", age: 16, isAdmin: true })],
       }),
-      test("Level 5 without the key is not enough", [text("#door", "Sealed")], {
-        steps: [...times(4, click("#train")), click("#open")],
+      test("Young John gets only A", [logs("A")], {
+        steps: [call("checkDoors", { name: "John", age: 16, isAdmin: false })],
       }),
-      test("The key and a badge open it", [text("#door", "Open")], {
-        steps: [click("#key"), click("#badge"), click("#open")],
-      }),
-      test("The key and level 5 open it", [text("#door", "Open")], {
-        steps: [click("#key"), ...times(4, click("#train")), click("#open")],
+      test("An adult who isn't John gets A and B", [logs("A", "B")], {
+        steps: [call("checkDoors", { name: "Ana", age: 30, isAdmin: false })],
       }),
     ],
   },
@@ -1286,72 +1183,55 @@ export const lessons = [
     title: "Empty the quiver",
     chapter: "Guild hall",
     concept: "Truthy & falsy values",
+    console: true,
     description:
       "The hero has 3 arrows, and each shot uses one. When the quiver is empty, the goblin laughs and the count never drops below 0.",
     objectives: [
       "Use arrows itself as the condition: if (arrows).",
-      "While arrows remain, subtract 1, show the count in #arrows, and set #goblin to Hit!.",
-      "When arrows is 0, set #goblin to Ha ha! and leave the count at 0.",
+      "While arrows remain, shoot() subtracts 1 and returns Hit!.",
+      "When arrows is 0, shoot() returns Ha ha! and leaves arrows at 0.",
     ],
     steps: [
       "Inside shoot, write if (arrows), with no comparison.",
-      'In the if: arrows -= 1; then $("#arrows").text(arrows); then set #goblin to "Hit!".',
-      'In the else, set #goblin to "Ha ha!". Run spell: the tests shoot for you.',
+      'Inside it, subtract one with arrows -= 1; and return "Hit!".',
+      'Add an else that returns "Ha ha!". Run spell: the tests shoot until the quiver is empty.',
     ],
     syntax:
-      "let potions = 2;\nif (potions) {\n  // runs for any number except 0\n}",
+      "const user = { age: 25, id: 0 };\n\nif (user.age) {\n  // this will happen!\n}\nif (user.id) {\n  // this will NOT happen!\n}",
     explanation:
-      'Inside the (parentheses) of an if, JavaScript forces the value to become true or false: this is a boolean context. Falsy values become false: null, undefined, 0, "", false, and NaN. Everything else is truthy. So if (arrows) runs while arrows is 3, 2, or 1, and stops at 0. if (arrows > 0) also passes the checks; the short form is the point of this quest.',
+      "The (parentheses) of an if are a boolean context: JavaScript turns whatever is inside into true or false. The falsy values are null, undefined, 0, \"\", false, and NaN; everything else is truthy. So if (arrows) is true for 3, 2, and 1, and false only at 0.",
     starter:
-      '// The hero starts with 3 arrows. When #shoot is clicked, use the\n// number of arrows itself as the condition. If any are left, subtract\n// 1, show the new count in #arrows, and set the goblin\'s text to\n// "Hit!". Otherwise, set the goblin\'s text to "Ha ha!".\nlet arrows = 3;\n\nfunction shoot() {\n\n}\n\n$("#shoot").on("click", shoot);',
-    html: '<section id="battle"><p>Arrows: <span id="arrows">3</span></p><button id="shoot" type="button">Shoot</button><p id="goblin">Goblin</p></section>',
+      '// The hero starts with 3 arrows. Each call to shoot uses one arrow and\n// returns "Hit!", until the quiver is empty: then shoot returns "Ha ha!"\n// and arrows stays at 0.\nlet arrows = 3;\n\nfunction shoot() {\n\n}',
+    html: '<section id="battle"><p id="goblin">Goblin</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="goblin">Hit!</p><p id="hero">Hero</p></section>',
     scene: [
       ["#goblin", "goblin", [[5, 2]], (el) => el.textContent === "Hit!"],
-      ["#arrows", "label", [[2, 6]]],
+      ["#hero", "hero", [[2, 4]]],
     ],
     hints: [
       "if (arrows) is false only when arrows is 0.",
       "Subtract inside the if, so an empty quiver stays at 0.",
-      "Show the count after subtracting.",
+      "Check first, then subtract: the third shot still hits.",
     ],
     solution:
-      'let arrows = 3;\n\nfunction shoot() {\n  if (arrows) {\n    arrows -= 1;\n    $("#arrows").text(arrows);\n    $("#goblin").text("Hit!");\n  } else {\n    $("#goblin").text("Ha ha!");\n  }\n}\n\n$("#shoot").on("click", shoot);',
+      'let arrows = 3;\n\nfunction shoot() {\n  if (arrows) {\n    arrows -= 1;\n    return "Hit!";\n  } else {\n    return "Ha ha!";\n  }\n}',
     reward: 20,
     source:
       "Lecture: Advanced Conditionals — slides 9–10, Boolean Context and Truthy & Falsey",
     tests: [
-      test("Nothing fires before a click", [
-        text("#arrows", "3"),
-        text("#goblin", "Goblin"),
+      test("The first shot hits", [returns("shoot", [], "Hit!")]),
+      test(
+        "Three arrows, three hits",
+        times(3, returns("shoot", [], "Hit!")),
+      ),
+      test("An empty quiver makes the goblin laugh", [
+        ...times(3, returns("shoot", [], "Hit!")),
+        returns("shoot", [], "Ha ha!"),
       ]),
-      test(
-        "One shot hits and uses an arrow",
-        [text("#arrows", "2"), text("#goblin", "Hit!")],
-        {
-          steps: [click("#shoot")],
-        },
-      ),
-      test(
-        "A fourth shot finds the quiver empty",
-        [text("#arrows", "0"), text("#goblin", "Ha ha!")],
-        {
-          steps: times(4, click("#shoot")),
-        },
-      ),
-      test(
-        "The count never drops below 0",
-        [text("#arrows", "0"), text("#goblin", "Ha ha!")],
-        {
-          steps: times(6, click("#shoot")),
-        },
-      ),
-      test(
-        "All three arrows hit",
-        [text("#arrows", "0"), text("#goblin", "Hit!")],
-        {
-          steps: times(3, click("#shoot")),
-        },
-      ),
+      test("It stays empty", [
+        ...times(3, returns("shoot", [], "Hit!")),
+        ...times(3, returns("shoot", [], "Ha ha!")),
+      ]),
     ],
   },
   {
@@ -1359,69 +1239,49 @@ export const lessons = [
     title: "Join the party",
     chapter: "Goblin king",
     concept: "Falsy strings & !",
+    console: true,
     description:
-      "A slime wants to join the party before the last fight, but it needs a name first. An empty name is falsy, so ! catches it.",
+      "A slime wants to join the party before the last fight, but it needs a name first. An empty or missing name is falsy, so ! catches it.",
     objectives: [
-      "When #join is clicked, read #recruit-name with .val().",
-      "If !name, set #message to Name required and leave #recruit alone.",
-      "Otherwise set #recruit to the name and #message to Welcome, followed by the name.",
+      "recruit(name) returns Name required if !name.",
+      "Otherwise it returns Welcome, followed by the name, like Welcome, Goo.",
     ],
     steps: [
-      'Inside join, save the value: const name = $("#recruit-name").val();',
-      'Write if (!name) and set #message to "Name required".',
-      'In the else, set #recruit to name and #message to "Welcome, " + name. Run spell.',
+      'Inside recruit, write if (!name) and return "Name required".',
+      'Add an else that returns "Welcome, " + name.',
+      'Try console.log(recruit("0")); and console.log(recruit()); then Run spell.',
     ],
     syntax:
-      'const answer = $("#answer").val();\nif (!answer) {\n  // runs when answer is "" (falsy)\n}',
+      'if (!nickname) {\n  // runs for "" and undefined, which are falsy\n} else {\n  // runs for any non-empty string\n}',
     explanation:
-      '"" (the empty string) is falsy, so !name is true exactly when nothing was typed. Every other string is truthy, even "0". This is the slides\' !user.ID trick: ! flips truthiness, so a missing or empty value becomes true. + joins strings: "Welcome, " + name.',
+      '"" is falsy, so !"" is true. A missing argument is undefined, which is falsy too. Any string with at least one character is truthy, even "0" or " ", so ! makes it false. In the slides, !user.ID is truthy because user.ID is undefined.',
     starter:
-      '// When #join is clicked, get the value of the name input. If the name\n// is empty, set the message to "Name required". Otherwise, set the\n// recruit\'s text to the name and set the message to "Welcome, "\n// followed by the name.\nfunction join() {\n\n}\n\n$("#join").on("click", join);',
-    html: '<section id="battle"><label>Name <input id="recruit-name" value=""></label><button id="join" type="button">Join party</button><p id="recruit">Recruit</p><p id="message">Who goes there?</p></section>',
+      '// recruit takes the slime\'s name. With no name (an empty string or\n// nothing at all), it returns "Name required". Otherwise it returns\n// "Welcome, " followed by the name.\nfunction recruit(name) {\n\n}',
+    html: '<section id="battle"><p id="recruit">Recruit</p><p id="hero">Hero</p></section>',
+    won: '<section id="battle"><p id="recruit">Goo</p><p id="hero">Hero</p></section>',
     scene: [
       ["#recruit", "slime", [[1, 5]], (el) => el.textContent !== "Recruit"],
-      ["#message", "label", [[3, 6]]],
+      ["#hero", "hero", [[2, 4]]],
     ],
     hints: [
       "! goes right before the variable: if (!name).",
-      '"Welcome, " + name joins the strings, including the comma and space.',
-      "Read the value inside join so each click checks the current text.",
+      'Join text with +: "Welcome, " + name.',
+      "There is a space after the comma.",
     ],
     solution:
-      'function join() {\n  const name = $("#recruit-name").val();\n  if (!name) {\n    $("#message").text("Name required");\n  } else {\n    $("#recruit").text(name);\n    $("#message").text("Welcome, " + name);\n  }\n}\n\n$("#join").on("click", join);',
+      'function recruit(name) {\n  if (!name) {\n    return "Name required";\n  } else {\n    return "Welcome, " + name;\n  }\n}',
     reward: 20,
     source:
       "Lecture: Advanced Conditionals — slides 10–12, Truthy & Falsey and the ! operator",
     tests: [
-      test(
-        "An empty name is refused",
-        [text("#message", "Name required"), text("#recruit", "Recruit")],
-        { steps: [click("#join")] },
-      ),
-      test(
-        "The name 0 is still a name",
-        [text("#recruit", "0"), text("#message", "Welcome, 0")],
-        {
-          steps: [value("#recruit-name", "0"), click("#join")],
-        },
-      ),
-      test(
-        "Clearing the name is refused again",
-        [text("#message", "Name required"), text("#recruit", "Moss")],
-        {
-          steps: [
-            value("#recruit-name", "Moss"),
-            click("#join"),
-            value("#recruit-name", ""),
-            click("#join"),
-          ],
-        },
-      ),
-      test(
-        "A name joins the party",
-        [text("#recruit", "Fern"), text("#message", "Welcome, Fern")],
-        { steps: [value("#recruit-name", "Fern"), click("#join")] },
-      ),
+      test("An empty name is required", [
+        returns("recruit", [""], "Name required"),
+      ]),
+      test("A missing name is required", [
+        returns("recruit", [], "Name required"),
+      ]),
+      test("A name is welcomed", [returns("recruit", ["Goo"], "Welcome, Goo")]),
+      test('"0" is a truthy string', [returns("recruit", ["0"], "Welcome, 0")]),
     ],
   },
   {
@@ -1429,71 +1289,57 @@ export const lessons = [
     title: "Flip the coin",
     chapter: "Goblin king",
     concept: "The ternary operator",
+    console: true,
     description:
       "Flip a coin for the hero's blessing before the final battle. Heads glows gold; tails glows silver.",
     objectives: [
-      "On each #flip click, use condition ? a : b to pick Heads when Math.random() > 0.5 and Tails otherwise.",
-      "Show the result in #hero.",
-      "Use a second ternary to set the color of #hero to gold for Heads and silver for Tails.",
+      "flip() uses condition ? a : b to return Heads when Math.random() > 0.5 and Tails otherwise.",
+      "coinColor(result) uses another ternary to return gold for Heads and silver for Tails.",
     ],
     steps: [
-      'Inside flip: const result = Math.random() > 0.5 ? "Heads" : "Tails";',
-      'Show it with $("#hero").text(result);',
-      'Then: $("#hero").css("color", result === "Heads" ? "gold" : "silver"); Run spell.',
+      'Inside flip: return Math.random() > 0.5 ? "Heads" : "Tails";',
+      'Inside coinColor: return result === "Heads" ? "gold" : "silver";',
+      "Try console.log(flip()); a few times, then Run spell.",
     ],
     syntax: 'const label = score >= 50 ? "Pass" : "Fail";',
     explanation:
-      "The expression condition ? a : b resolves to a when the condition is true and to b when it is false. It replaces an if/else whose only job is to choose a value, so it fits inside a const or a method call. Draw Math.random() once and reuse result, or the color could disagree with the text. The checks look at results, so an if/else also passes; the ternary is the shorter spell.",
+      "The expression condition ? a : b resolves to a when the condition is true and to b when it is false. It replaces an if/else whose only job is to choose a value, so it fits in a return or a const. The checks look at results, so an if/else also passes; the ternary is the shorter spell.",
     starter:
-      '// When #flip is clicked, use the ternary operator to save "Heads" if a\n// random number is above 0.5 and "Tails" otherwise. Show the result on\n// the hero, then use another ternary to set the hero\'s text color to\n// gold for "Heads" and silver for "Tails".\nfunction flip() {\n\n}\n\n$("#flip").on("click", flip);',
-    html: '<section id="battle"><p id="hero" style="color:white">Waiting</p><button id="flip" type="button">Flip coin</button><p class="goblin">Goblin</p></section>',
+      '// flip returns "Heads" when a random number is above 0.5 and "Tails"\n// otherwise. coinColor returns "gold" for "Heads" and "silver" for\n// "Tails". Both use the ternary operator.\nfunction flip() {\n\n}\n\nfunction coinColor(result) {\n\n}',
+    html: '<section id="battle"><p id="hero">Waiting</p><p class="goblin">Goblin</p></section>',
+    won: '<section id="battle"><p id="hero" style="color:gold">Heads</p><p class="goblin">Goblin</p></section>',
     scene: [
-      ["#hero", "hero", [[2, 4]]],
+      ["#hero", "hero", [[2, 4]], (el) => el.textContent === "Heads"],
       [".goblin", "goblin", [[5, 2]]],
     ],
     hints: [
       "The shape is condition ? valueIfTrue : valueIfFalse.",
-      "Save the first ternary in const result.",
-      'The second ternary checks result === "Heads".',
+      "Put return in front of the whole ternary.",
+      'coinColor checks result === "Heads".',
     ],
     solution:
-      'function flip() {\n  const result = Math.random() > 0.5 ? "Heads" : "Tails";\n  $("#hero").text(result);\n  $("#hero").css("color", result === "Heads" ? "gold" : "silver");\n}\n\n$("#flip").on("click", flip);',
+      'function flip() {\n  return Math.random() > 0.5 ? "Heads" : "Tails";\n}\n\nfunction coinColor(result) {\n  return result === "Heads" ? "gold" : "silver";\n}',
     reward: 20,
     source: "Lecture: Advanced Conditionals — slides 13–14, Ternary Operator",
     tests: [
-      test("Nothing flips before a click", [
-        text("#hero", "Waiting"),
-        css("#hero", "color", "rgb(255, 255, 255)"),
-      ]),
-      test(
-        "A high draw is Heads in gold",
-        [text("#hero", "Heads"), css("#hero", "color", "rgb(255, 215, 0)")],
-        { random: [0.9], steps: [click("#flip")] },
-      ),
-      test(
-        "A low draw is Tails in silver",
-        [text("#hero", "Tails"), css("#hero", "color", "rgb(192, 192, 192)")],
-        { random: [0.1], steps: [click("#flip")] },
-      ),
-      test("Exactly 0.5 is Tails", [text("#hero", "Tails")], {
+      test("A high draw is Heads", [returns("flip", [], "Heads")], {
+        random: [0.9],
+      }),
+      test("A low draw is Tails", [returns("flip", [], "Tails")], {
+        random: [0.1],
+      }),
+      test("Exactly 0.5 is Tails", [returns("flip", [], "Tails")], {
         random: [0.5],
-        steps: [click("#flip")],
       }),
       test(
         "Every flip draws again",
-        [text("#hero", "Heads"), css("#hero", "color", "rgb(255, 215, 0)")],
-        {
-          random: [0.2, 0.7],
-          steps: [
-            click("#flip"),
-            check(
-              text("#hero", "Tails"),
-              css("#hero", "color", "rgb(192, 192, 192)"),
-            ),
-            click("#flip"),
-          ],
-        },
+        [returns("flip", [], "Tails"), returns("flip", [], "Heads")],
+        { random: [0.2, 0.7] },
       ),
+      test("Heads glows gold, Tails silver", [
+        returns("coinColor", ["Heads"], "gold"),
+        returns("coinColor", ["Tails"], "silver"),
+      ]),
     ],
   },
   {
@@ -1501,28 +1347,29 @@ export const lessons = [
     title: "Catch the goblin king",
     chapter: "Final battle",
     concept: "Collision detection: doCollide",
+    console: true,
     description:
-      "Walk the hero into the goblin king. Two boxes collide only when they overlap both across and down; touching edges don't count.",
+      "Close in on the goblin king. Two boxes collide only when they overlap both across and down; touching edges don't count.",
     objectives: [
-      "Make doCollide(a, b) return true only when box a overlaps box b.",
+      "doCollide(a, b) returns true only when box a overlaps box b, and false otherwise.",
       "Compare opposite sides: a's left with b's right, a's right with b's left, and the same for top and bottom.",
-      "After every move, set #boss to Hit! if doCollide(hero, boss) is true, otherwise Clear.",
     ],
     steps: [
       "In doCollide, work out each side: left is x, right is x + width, top is y, bottom is y + height.",
-      "Return true only if a's left < b's right && a's right > b's left && a's top < b's bottom && a's bottom > b's top. Otherwise return false.",
-      'In update, below the .css() line: $("#boss").text(doCollide(hero, boss) ? "Hit!" : "Clear"); Run spell: the tests walk the hero for you.',
+      "Return true only if a's left < b's right && a's right > b's left && a's top < b's bottom && a's bottom > b's top.",
+      "Otherwise return false. Try console.log(doCollide(hero, boss)); then Run spell.",
     ],
     syntax:
       "const box = { x: 10, y: 20, width: 50, height: 30 };\nconst left = box.x;\nconst right = box.x + box.width;\nconst top = box.y;\nconst bottom = box.y + box.height;",
     explanation:
-      "A box's x and y mark its top-left corner, and y grows downward. Its sides are left = x, right = x + width, top = y, and bottom = y + height. Two boxes overlap only when each starts before the other ends, both across (a's left < b's right and a's right > b's left) and down (a's top < b's bottom and a's bottom > b's top). Using < and > means boxes that only touch don't collide. .css(\"left\", hero.x) and .css(\"top\", hero.y) move the hero; in the arena, 50px is one tile.",
+      "A box's x and y mark its top-left corner, and y grows downward. Its sides are left = x, right = x + width, top = y, and bottom = y + height. Two boxes overlap only when each starts before the other ends, both across (a's left < b's right and a's right > b's left) and down (a's top < b's bottom and a's bottom > b's top). Using < and > means boxes that only touch don't collide.",
     starter:
-      '// Each box has an x, y, width, and height. doCollide returns true only\n// if box a overlaps box b. After every move, show the hero at its new\n// position, then set the boss\'s text to "Hit!" if the boxes collide\n// and "Clear" if they don\'t.\nconst hero = { x: 0, y: 0, width: 50, height: 50 };\nconst boss = { x: 100, y: 100, width: 50, height: 50 };\n\nfunction doCollide(a, b) {\n\n}\n\nfunction update() {\n  $("#hero").css("left", hero.x).css("top", hero.y);\n\n}\n\nfunction moveRight() {\n  hero.x += 25;\n  update();\n}\n\nfunction moveDown() {\n  hero.y += 25;\n  update();\n}\n\n$("#right").on("click", moveRight);\n$("#down").on("click", moveDown);',
-    html: '<section id="battle"><p id="hero" style="left:0px;top:0px">Hero</p><p id="boss" style="left:100px;top:100px">Clear</p><button id="right" type="button">Step right</button><button id="down" type="button">Step down</button></section>',
+      "// Each box has an x, y, width, and height. doCollide returns true only\n// if box a overlaps box b, and false otherwise.\nconst hero = { x: 0, y: 0, width: 50, height: 50 };\nconst boss = { x: 100, y: 100, width: 50, height: 50 };\n\nfunction doCollide(a, b) {\n\n}",
+    html: '<section id="battle"><p id="hero">Hero</p><p id="boss">Clear</p></section>',
+    won: '<section id="battle"><p id="hero" style="left:75px;top:75px">Hero</p><p id="boss">Hit!</p></section>',
     scene: [
       ["#hero", "hero", [[1, 1]]],
-      ["#boss", "boss", [[1, 1]], (el) => el.textContent === "Hit!"],
+      ["#boss", "boss", [[3, 3]], (el) => el.textContent === "Hit!"],
     ],
     hints: [
       "a.x + a.width is a's right side; a.y + a.height is its bottom.",
@@ -1530,39 +1377,54 @@ export const lessons = [
       "Use < and >, not <= and >=: touching edges are not a hit.",
     ],
     solution:
-      'const hero = { x: 0, y: 0, width: 50, height: 50 };\nconst boss = { x: 100, y: 100, width: 50, height: 50 };\n\nfunction doCollide(a, b) {\n  const aRight = a.x + a.width;\n  const aBottom = a.y + a.height;\n  const bRight = b.x + b.width;\n  const bBottom = b.y + b.height;\n  if (a.x < bRight && aRight > b.x && a.y < bBottom && aBottom > b.y) {\n    return true;\n  } else {\n    return false;\n  }\n}\n\nfunction update() {\n  $("#hero").css("left", hero.x).css("top", hero.y);\n  $("#boss").text(doCollide(hero, boss) ? "Hit!" : "Clear");\n}\n\nfunction moveRight() {\n  hero.x += 25;\n  update();\n}\n\nfunction moveDown() {\n  hero.y += 25;\n  update();\n}\n\n$("#right").on("click", moveRight);\n$("#down").on("click", moveDown);',
+      "const hero = { x: 0, y: 0, width: 50, height: 50 };\nconst boss = { x: 100, y: 100, width: 50, height: 50 };\n\nfunction doCollide(a, b) {\n  const aRight = a.x + a.width;\n  const aBottom = a.y + a.height;\n  const bRight = b.x + b.width;\n  const bBottom = b.y + b.height;\n  if (a.x < bRight && aRight > b.x && a.y < bBottom && aBottom > b.y) {\n    return true;\n  } else {\n    return false;\n  }\n}",
     reward: 20,
     source:
-      "Lecture: Advanced Conditionals — slides 16–20 and 23, doCollide, Object Borders, and the jQuery Reference",
+      "Lecture: Advanced Conditionals — slides 16–20 and 23, doCollide and Object Borders",
     tests: [
-      test("The hero starts clear", [text("#boss", "Clear")]),
-      test("Beside the boss but higher up is clear", [text("#boss", "Clear")], {
-        steps: times(3, click("#right")),
-      }),
-      test(
-        "Level with the boss but off to the left is clear",
-        [text("#boss", "Clear")],
-        {
-          steps: times(3, click("#down")),
-        },
+      ...[
+        ["Far apart is clear", 0, 0, false],
+        ["Beside the boss but higher up is clear", 75, 0, false],
+        ["Level with the boss but off to the left is clear", 0, 75, false],
+        ["Touching a side edge is clear", 50, 75, false],
+        ["Touching the top edge is clear", 75, 50, false],
+        ["Past the boss is clear", 175, 75, false],
+        ["Below the boss is clear", 75, 175, false],
+        ["Overlapping the boss is a hit", 75, 75, true],
+      ].map(([label, x, y, hit]) =>
+        test(label, [
+          returns(
+            "doCollide",
+            [
+              { x, y, width: 50, height: 50 },
+              { x: 100, y: 100, width: 50, height: 50 },
+            ],
+            hit,
+          ),
+        ]),
       ),
-      test("Touching edges is clear", [text("#boss", "Clear")], {
-        steps: [...times(2, click("#right")), ...times(3, click("#down"))],
-      }),
-      test("Walking past the boss is clear", [text("#boss", "Clear")], {
-        steps: [...times(7, click("#right")), ...times(3, click("#down"))],
-      }),
-      test("Walking below the boss is clear", [text("#boss", "Clear")], {
-        steps: [...times(3, click("#right")), ...times(7, click("#down"))],
-      }),
-      test("Overlapping the boss is a hit", [text("#boss", "Hit!")], {
-        steps: [
-          ...times(3, click("#right")),
-          ...times(2, click("#down")),
-          check(text("#boss", "Clear")),
-          click("#down"),
-        ],
-      }),
+      test("A big box around the boss is a hit, either way round", [
+        returns(
+          "doCollide",
+          [
+            { x: 0, y: 0, width: 300, height: 300 },
+            { x: 100, y: 100, width: 50, height: 50 },
+          ],
+          true,
+        ),
+        returns(
+          "doCollide",
+          [
+            { x: 100, y: 100, width: 50, height: 50 },
+            { x: 0, y: 0, width: 300, height: 300 },
+          ],
+          true,
+        ),
+      ]),
     ],
   },
 ];
+
+// A quest's topic is its lecture. Each topic's first quest is always open.
+export const topicOf = (lesson) =>
+  lesson.source.split(" — ")[0].replace("Lecture: ", "");

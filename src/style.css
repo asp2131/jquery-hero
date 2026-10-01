@@ -112,6 +112,14 @@ a {
 .nav-item:hover {
   color: var(--text);
 }
+#topic-select {
+  color-scheme: dark;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
 .icon-button {
   position: relative;
   font-size: 19px;
