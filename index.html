@@ -76,28 +76,45 @@
             <p class="eyebrow" id="mission-number">QUEST 01 / 24</p>
             <h2 id="mission-title">Defend the villager</h2>
             <p class="mission-description" id="mission-description"></p>
-            <ul class="objectives" id="objectives"></ul>
-            <div class="mission-links">
-              <button id="hint-button">Hint</button>
-              <details class="guide-note">
-                <summary>How does this work?</summary>
-                <p id="guide-note"></p>
-                <small
-                  ><span id="mission-concept"></span> ·
-                  <a id="slides-link" target="_blank" rel="noopener"
-                    ><span id="source-label"></span> ↗</a
-                  ></small
-                >
-              </details>
-            </div>
-            <div id="hint-panel" class="hint-panel" hidden>
-              <div id="hint-content"></div>
-              <div class="hint-actions">
-                <button id="next-hint">Another hint</button
-                ><button id="solution-button">Example solution</button>
-              </div>
-            </div>
           </article>
+          <div class="help-section">
+            <div class="help-toolbar" aria-label="Quest help">
+              <button id="brief-button" class="help-toggle" aria-expanded="false" aria-controls="help-drawer">Quest brief</button>
+              <button id="hint-button" class="help-toggle" aria-expanded="false" aria-controls="help-drawer">Hint</button>
+              <button id="steps-button" class="help-toggle" aria-expanded="false" aria-controls="help-drawer">Walkthrough</button>
+            </div>
+            <section id="help-drawer" class="help-drawer" aria-labelledby="help-title" hidden>
+              <div class="help-heading">
+                <h3 id="help-title">Quest brief</h3>
+                <button id="close-help" class="help-close" aria-label="Close quest help">×</button>
+              </div>
+              <div id="brief-panel" class="help-panel" hidden>
+                <ul class="objectives" id="objectives"></ul>
+              </div>
+              <div id="hint-panel" class="help-panel" hidden>
+                <div id="hint-content" aria-live="polite"></div>
+                <div class="hint-actions">
+                  <button id="previous-hint">Previous</button>
+                  <span id="hint-position"></span>
+                  <button id="next-hint">Next hint</button>
+                </div>
+                <button id="solution-button" class="reset-code" hidden>Example solution</button>
+              </div>
+              <div id="steps-panel" class="help-panel" hidden>
+                <ol id="coding-steps"></ol>
+                <pre class="syntax-example"><code id="syntax-example"></code></pre>
+                <details class="guide-note">
+                  <summary>About this concept</summary>
+                  <p id="guide-note"></p>
+                  <small>
+                    <span id="mission-concept"></span> ·
+                    <a id="slides-link" target="_blank" rel="noopener"><span id="source-label"></span> ↗</a>
+                  </small>
+                </details>
+                <p class="coding-note">jQuery is ready to use. Write in <strong>quest.js</strong>; <strong>index.html</strong> is your read-only reference.</p>
+              </div>
+            </section>
+          </div>
           <div class="editor-card">
             <div class="editor-tabs" role="tablist" aria-label="Exercise files">
               <button
@@ -116,7 +133,6 @@
               >
                 index.html <small>read-only</small>
               </button>
-              <span class="jquery-loaded">jQuery loaded</span>
             </div>
             <div
               id="panel-js"
@@ -135,27 +151,28 @@
             >
               <pre id="html-source"></pre>
             </div>
+            <div class="editor-status">
+              <button id="syntax-status" class="syntax-status" data-state="checking" disabled aria-live="polite" aria-atomic="true">Checking syntax…</button>
+              <span id="editor-shortcut" class="editor-shortcut">⌘/Ctrl + Enter</span>
+            </div>
           </div>
           <div class="run-section">
             <button id="run-button" class="run-button" title="⌘/Ctrl + Enter">
               <span class="play-icon">▶</span><span id="run-label">Run spell</span></button
             ><button id="reset-code" class="reset-code" title="Reset code to starter">
               Reset</button
-            ><button id="continue-button" class="continue-button" disabled>
-              <span class="lock-icon" aria-hidden="true">🔒</span> Next quest
+            ><button id="continue-button" class="continue-button" disabled hidden>
+              Next quest
               <span>→</span>
             </button>
           </div>
-          <div class="test-section" id="test-section" hidden>
-            <p id="run-caption" class="run-caption"></p>
-            <div id="test-results" aria-live="polite"></div>
+          <details class="test-section" id="test-section" hidden>
+            <summary>
+              <span id="run-caption" class="run-caption"></span>
+              <span class="result-disclosure">Details</span>
+            </summary>
+            <div id="test-results"></div>
             <div id="run-error" class="run-error" role="alert" hidden></div>
-          </div>
-          <details class="coding-directions" open>
-            <summary>What to code in quest.js</summary>
-            <ol id="coding-steps"></ol>
-            <pre class="syntax-example"><code id="syntax-example"></code></pre>
-            <p class="coding-note">jQuery is already loaded. Write JavaScript in <strong>quest.js</strong>; the <strong>index.html</strong> tab is a read-only reference, not your task.</p>
           </details>
         </section>
       </main>

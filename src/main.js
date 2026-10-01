@@ -18,12 +18,12 @@ import { javascript } from "@codemirror/lang-javascript";
 import {
   syntaxHighlighting,
   HighlightStyle,
-  bracketMatching,
   indentOnInput,
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { lessons } from "./lessons.js";
 import { createArena } from "./arena.js";
+import { syntaxSupport } from "./editor-syntax.js";
 
 const $ = (id) => document.getElementById(id);
 // v2: battle lessons. v1 progress carries over; its drafts are old island code.
@@ -128,6 +128,11 @@ let loadingLesson = false;
 let hintCount = 0;
 let currentResult = null;
 let toastTimer;
+let activeHelp = null;
+let syntaxDiagnostic = null;
+const runShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
+  ? "⌘ Enter"
+  : "Ctrl + Enter";
 let audio;
 const currentLesson = () => lessons[state.active];
 
@@ -191,6 +196,23 @@ const highlights = HighlightStyle.define([
   { tag: tags.punctuation, color: "#c4d0de" },
   { tag: tags.variableName, color: "#34d8f2" },
 ]);
+function renderSyntaxStatus({ state: status, diagnostic }) {
+  syntaxDiagnostic = diagnostic || null;
+  const button = $("syntax-status");
+  button.dataset.state = status;
+  button.disabled = !diagnostic;
+  button.textContent = diagnostic
+    ? `Line ${diagnostic.line}: ${diagnostic.message}`
+    : status === "checking"
+      ? "Checking syntax…"
+      : "No syntax errors";
+  button.title = diagnostic
+    ? `${button.textContent} Click to jump to the error.`
+    : "Syntax checks only. Run your spell to check the quest.";
+  button.setAttribute("aria-label", diagnostic
+    ? `${button.textContent} Jump to the error.`
+    : button.textContent);
+}
 const editorExtensions = [
   lineNumbers(),
   highlightActiveLine(),
@@ -198,7 +220,7 @@ const editorExtensions = [
   drawSelection(),
   history(),
   javascript(),
-  bracketMatching(),
+  ...syntaxSupport(renderSyntaxStatus),
   indentOnInput(),
   syntaxHighlighting(highlights),
   EditorView.lineWrapping,
@@ -291,6 +313,16 @@ function renderTests() {
   );
   // The objectives already describe the goal; checkpoints only matter after a run.
   $("test-section").hidden = !currentResult;
+  const passedCount = currentResult?.tests.filter((test) => test.passed).length || 0;
+  const passed = !!currentResult && !currentResult.error &&
+    tests.length > 0 && passedCount === tests.length;
+  $("test-section").open = !!currentResult && !passed;
+  $("test-section").dataset.state = passed ? "pass" : "fail";
+  $("run-caption").textContent = currentResult?.error
+    ? "Your spell hit an error"
+    : passed
+      ? `All ${tests.length} checks passed`
+      : `${passedCount} / ${tests.length} checks passed`;
   $("run-error").hidden = !currentResult?.error;
   $("run-error").textContent = currentResult?.error || "";
   // FreeCodeCamp style: Next quest unlocks only after the tests just passed for this attempt.
@@ -301,6 +333,7 @@ function renderTests() {
     currentResult.tests.length > 0 &&
     currentResult.tests.every((test) => test.passed);
   $("continue-button").disabled = !complete;
+  $("continue-button").hidden = !complete;
   $("continue-button").title = complete
     ? ""
     : "Complete the quest: write your code, run the spell, pass every check.";
@@ -310,7 +343,7 @@ function renderTests() {
     .classList.toggle("complete", complete);
   $("continue-button").innerHTML = complete
     ? `${state.active === lessons.length - 1 ? "See your adventure" : "Next quest"} <span>→</span>`
-    : `<span class="lock-icon" aria-hidden="true">🔒</span> Next quest <span>→</span>`;
+    : "Next quest";
 }
 function setScene(lesson, html, animate = false) {
   // DOMParser never runs scripts; the arena reads only text, inline styles, classes, and attributes.
@@ -360,10 +393,16 @@ function selectTab(name) {
     $(`tab-${tab}`).tabIndex = selected ? 0 : -1;
     $(`panel-${tab}`).hidden = !selected;
   }
+  $("syntax-status").hidden = name !== "js";
+  $("editor-shortcut").textContent =
+    name === "js" ? runShortcut : "Read-only reference";
   if (name === "js") editor.requestMeasure();
 }
 function renderLesson(lesson, key) {
   hintCount = 0;
+  setHelp(null);
+  document.querySelector(".guide-note").open = false;
+  renderSyntaxStatus({ state: "checking" });
   currentResult = null;
   loadingLesson = true;
   editor.setState(
@@ -391,7 +430,6 @@ function renderLesson(lesson, key) {
   }
   $("syntax-example").textContent = lesson.syntax;
   $("html-source").innerHTML = formatHTML(lesson.html);
-  $("hint-panel").hidden = true;
   $("run-label").textContent = "Run spell";
   selectTab("js");
   renderTests();
@@ -408,6 +446,7 @@ function selectLesson(index) {
 
 async function execute() {
   if (running) return;
+  setHelp(null);
   running = true;
   const index = state.active;
   const lesson = lessons[index];
@@ -451,7 +490,6 @@ async function execute() {
         "Spell successful",
         `${result.tests.length} / ${result.tests.length} checks passed${firstPass ? ` · +${lesson.reward} crystals` : ""}`,
       );
-      $("run-caption").textContent = "Beautifully done. Your code won the fight.";
       if (state.completed.length === lessons.length && firstPass)
         showCompletion();
     } else {
@@ -463,8 +501,6 @@ async function execute() {
           ? "Your code hit an error. Fix it and cast again."
           : `${passedCount} / ${result.tests.length} checks passed. Tweak your spell and try again.`,
       );
-      $("run-caption").textContent =
-        "Not quite yet. Read the checkpoints, tweak your code, try again.";
     }
     renderTests();
   } catch (error) {
@@ -477,7 +513,6 @@ async function execute() {
       error: error.message || String(error),
       html: lesson.html,
     };
-    $("run-caption").textContent = "Your code hit an error.";
     setHud("lost", "Spell fizzled", "Your code hit an error. Fix it and cast again.");
     renderTests();
   } finally {
@@ -561,19 +596,37 @@ function showCompletion() {
   );
   $("completion-map").onclick = showMap;
 }
+const helpTitles = {
+  brief: "Quest brief",
+  hint: "A little nudge",
+  steps: "Walkthrough",
+};
+
+function setHelp(name, restoreFocus = false) {
+  const previous = activeHelp;
+  activeHelp = name;
+  $("help-drawer").hidden = !name;
+  for (const key of Object.keys(helpTitles)) {
+    $(`${key}-button`).setAttribute("aria-expanded", String(key === name));
+    $(`${key}-panel`).hidden = key !== name;
+  }
+  if (name) {
+    $("help-title").textContent = helpTitles[name];
+    $("help-drawer").scrollTop = 0;
+  }
+  if (restoreFocus && previous) $(`${previous}-button`).focus();
+}
+
 function showHints() {
-  const lesson = currentLesson();
-  hintCount = Math.min(hintCount + 1, lesson.hints.length);
-  $("hint-panel").hidden = false;
-  $("hint-content").replaceChildren(
-    ...lesson.hints.slice(0, hintCount).map((hint, i) => {
-      const p = document.createElement("p");
-      p.textContent = `${i + 1}. ${hint}`;
-      return p;
-    }),
-  );
-  $("next-hint").disabled = hintCount >= lesson.hints.length;
-  $("solution-button").hidden = hintCount < lesson.hints.length;
+  const hints = currentLesson().hints;
+  hintCount = Math.max(1, Math.min(hintCount, hints.length));
+  const paragraph = document.createElement("p");
+  paragraph.textContent = hints[hintCount - 1];
+  $("hint-content").replaceChildren(paragraph);
+  $("hint-position").textContent = `${hintCount} of ${hints.length}`;
+  $("previous-hint").disabled = hintCount <= 1;
+  $("next-hint").disabled = hintCount >= hints.length;
+  $("solution-button").hidden = hintCount < hints.length;
 }
 function confirmReset() {
   showDialog(
@@ -608,13 +661,47 @@ $("continue-button").onclick = () => {
 };
 $("map-button").onclick = showMap;
 $("guide-button").onclick = showGuide;
-$("hint-button").onclick = () => {
-  if (!$("hint-panel").hidden) $("hint-panel").hidden = true;
-  else showHints();
+for (const name of Object.keys(helpTitles)) {
+  $(`${name}-button`).onclick = () => {
+    if (activeHelp === name) setHelp(null);
+    else {
+      if (name === "hint") showHints();
+      setHelp(name);
+    }
+  };
+}
+$("close-help").onclick = () => setHelp(null, true);
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && activeHelp) {
+    event.preventDefault();
+    setHelp(null, true);
+  }
+});
+for (const eventName of ["pointerdown", "focusin"]) {
+  document.addEventListener(eventName, (event) => {
+    if (activeHelp && !event.target.closest(".help-section")) setHelp(null);
+  });
+}
+$("previous-hint").onclick = () => {
+  hintCount--;
+  showHints();
 };
-$("next-hint").onclick = showHints;
+$("next-hint").onclick = () => {
+  hintCount++;
+  showHints();
+};
+$("syntax-status").onclick = () => {
+  if (!syntaxDiagnostic) return;
+  const { from, to } = syntaxDiagnostic;
+  editor.dispatch({
+    selection: { anchor: from, head: to },
+    scrollIntoView: true,
+  });
+  editor.focus();
+};
 $("solution-button").onclick = () => {
   const lesson = currentLesson();
+  setHelp(null);
   showDialog(
     "One way through.",
     `QUEST ${number(state.active)} · EXAMPLE SOLUTION`,
@@ -677,6 +764,7 @@ $("slides-link").href = new URL(
   "../ASD 05 PD - jQuery - Google Slides.pdf",
   import.meta.url,
 ).href;
+$("run-button").title = `Run spell (${runShortcut})`;
 selectLesson(state.active);
 renderSound();
 if (import.meta.hot)
