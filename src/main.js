@@ -559,7 +559,7 @@ function showGuide() {
     [
       "02 · Find the right element",
       '$("p")        // all paragraph elements\n$(".secret")  // every element with this class\n$("#hero")    // the element with this ID',
-      "A selector finds existing elements. An action changes them. Each instruction card tells you which selector and method to use; index.html is only a reference for the starting elements.",
+      "A selector finds existing elements. An action changes them. Quest brief lists the requirements; Hint gives one nudge at a time, and Walkthrough explains the steps. index.html is only a reference for the starting elements.",
     ],
     [
       "03 · Change what the arena sees",
@@ -585,7 +585,7 @@ function showGuide() {
   showDialog(
     "A pocket guide to jQuery.",
     "YOUR FIELD GUIDE",
-    `<p class="dialog-copy">No need to memorize everything. Keep experimenting. Your progress is saved in this browser; no account or server is involved.</p>${sections.map(([title, code, text]) => `<section class="reference-section"><h3>${title}</h3><code>${escapeHTML(code)}</code><p>${escapeHTML(text)}</p></section>`).join("")}<section class="reference-section"><h3>Editor keys</h3><p>Tab indents. Cmd/Ctrl + Enter runs your spell.</p></section>`,
+    `<p class="dialog-copy">No need to memorize everything. Keep experimenting. Your progress is saved in this browser; no account or server is involved.</p>${sections.map(([title, code, text]) => `<section class="reference-section"><h3>${title}</h3><code>${escapeHTML(code)}</code><p>${escapeHTML(text)}</p></section>`).join("")}<section class="reference-section"><h3>Your editor</h3><p>Brackets and quotes close automatically. Matching brackets light up near your cursor. Red underlines flag syntax errors; click the message below your code to jump to the problem. No syntax errors does not mean the quest is solved: run your spell to check its behavior.</p><p>Tab indents. Cmd/Ctrl + Enter runs your spell. Escape closes quest help.</p></section>`,
   );
 }
 function showCompletion() {
