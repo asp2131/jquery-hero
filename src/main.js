@@ -37,6 +37,51 @@ const escapeHTML = (text) =>
         c
       ],
   );
+// Prettier-style layout for the read-only index.html tab, coloured like VS Code Dark+.
+// ponytail: approximates Prettier (80 cols, 2-space indent, breaks select/nested
+// blocks) without reformatting style attributes; fixtures are small and trusted.
+const VOID_TAG = /^(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
+const plain = (_, text) => text;
+const colored = (cls, text) =>
+  cls ? `<span class="${cls}">${escapeHTML(text)}</span>` : escapeHTML(text);
+const openTag = (el, tok) =>
+  tok("hl-punct", "<") +
+  tok("hl-tag", el.localName) +
+  [...el.attributes]
+    .map((a) => ` ${tok("hl-attr", a.name)}=${tok("hl-value", `"${a.value}"`)}`)
+    .join("") +
+  tok("hl-punct", VOID_TAG.test(el.localName) ? " />" : ">");
+const closeTag = (el, tok) =>
+  VOID_TAG.test(el.localName)
+    ? ""
+    : tok("hl-punct", "</") + tok("hl-tag", el.localName) + tok("hl-punct", ">");
+const inlineHTML = (node, tok) =>
+  node.nodeType === Node.TEXT_NODE
+    ? tok("", node.textContent.replace(/\s+/g, " "))
+    : openTag(node, tok) +
+      [...node.childNodes].map((child) => inlineHTML(child, tok)).join("") +
+      closeTag(node, tok);
+const blockHTML = (node, pad) => {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent.trim();
+    return text ? [pad + colored("", text)] : [];
+  }
+  const mustBreak =
+    /^(select|ul|ol)$/.test(node.localName) ||
+    [...node.children].some((child) => child.children.length);
+  if (!mustBreak && pad.length + inlineHTML(node, plain).length <= 80)
+    return [pad + inlineHTML(node, colored)];
+  return [
+    pad + openTag(node, colored),
+    ...[...node.childNodes].flatMap((child) => blockHTML(child, pad + "  ")),
+    pad + closeTag(node, colored),
+  ];
+};
+function formatHTML(html) {
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  return [...template.content.childNodes].flatMap((node) => blockHTML(node, "")).join("\n");
+}
 let storageAvailable = true;
 let state = {
   active: 0,
@@ -278,7 +323,10 @@ function setScene(lesson, html, animate = false) {
     const [, kind, spawns, on = () => false] = lesson.scene[rule];
     const n = matched[rule]++;
     // ponytail: extra matches line up behind the last spawn point; fine for a stray append or two.
-    const [x, y, level = 0] = spawns[n] ?? [spawns.at(-1)[0], spawns.at(-1)[1] + n - spawns.length + 1];
+    const [sx, sy, level = 0] = spawns[n] ?? [spawns.at(-1)[0], spawns.at(-1)[1] + n - spawns.length + 1];
+    // Inline left/top (from .css("left", px)) walk a piece from its spawn point, 50px per tile.
+    const x = sx + (parseFloat(el.style.left) || 0) / 50;
+    const y = sy + (parseFloat(el.style.top) || 0) / 50;
     let hidden = false;
     for (let node = el; node; node = node.parentElement)
       if (node.style.display === "none") hidden = true;
@@ -342,7 +390,7 @@ function renderLesson(lesson, key) {
     }));
   }
   $("syntax-example").textContent = lesson.syntax;
-  $("html-source").textContent = lesson.html;
+  $("html-source").innerHTML = formatHTML(lesson.html);
   $("hint-panel").hidden = true;
   $("run-label").textContent = "Run spell";
   selectTab("js");
@@ -449,8 +497,8 @@ function showDialog(title, eyebrow, html) {
 function showMap() {
   showDialog(
     "Choose your next challenge.",
-    "12 BATTLES",
-    `<p class="dialog-copy">Each battle teaches one jQuery skill. They unlock in order.</p><div class="quest-list">${lessons.map((lesson) => `<button class="quest-choice" data-quest="${lesson.id}" ${!isUnlocked(lesson.id) || running ? "disabled" : ""}><span>${state.completed.includes(lesson.id) ? "✓" : number(lesson.id)}</span><div><strong>${escapeHTML(lesson.title)}</strong><small>${!isUnlocked(lesson.id) ? "LOCKED · COMPLETE THE PREVIOUS QUEST" : escapeHTML(lesson.concept)}</small></div></button>`).join("")}</div>`,
+    `${lessons.length} BATTLES`,
+    `<p class="dialog-copy">Each battle teaches one new skill. They unlock in order.</p><div class="quest-list">${lessons.map((lesson) => `<button class="quest-choice" data-quest="${lesson.id}" ${!isUnlocked(lesson.id) || running ? "disabled" : ""}><span>${state.completed.includes(lesson.id) ? "✓" : number(lesson.id)}</span><div><strong>${escapeHTML(lesson.title)}</strong><small>${!isUnlocked(lesson.id) ? "LOCKED · COMPLETE THE PREVIOUS QUEST" : escapeHTML(lesson.concept)}</small></div></button>`).join("")}</div>`,
   );
   $("dialog-content")
     .querySelectorAll("[data-quest]")
@@ -509,7 +557,7 @@ function showCompletion() {
   showDialog(
     "The fortress is yours.",
     "CAMPAIGN COMPLETE",
-    `<div class="completion-art">{ ✧ }</div><p class="completion-copy">Twelve battles won.<br>You selected, styled, created, and connected a whole battlefield with real jQuery.</p><div class="completion-stats"><span>${lessons.reduce((sum, lesson) => sum + lesson.reward, 0)} crystals</span></div><div class="dialog-actions"><button id="completion-map" class="primary">Revisit the quests</button></div>`,
+    `<div class="completion-art">{ ✧ }</div><p class="completion-copy">${lessons.length} battles won.<br>You built a whole battlefield with real jQuery, then taught it to make decisions.</p><div class="completion-stats"><span>${lessons.reduce((sum, lesson) => sum + lesson.reward, 0)} crystals</span></div><div class="dialog-actions"><button id="completion-map" class="primary">Revisit the quests</button></div>`,
   );
   $("completion-map").onclick = showMap;
 }

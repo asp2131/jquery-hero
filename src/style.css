@@ -556,7 +556,20 @@ a {
   margin: 0;
   font: 13px/1.8 var(--mono);
   white-space: pre-wrap;
-  color: #b9c8d9;
+  color: #d4d4d4;
+}
+/* VS Code Dark+ HTML tokens */
+.hl-punct {
+  color: #808080;
+}
+.hl-tag {
+  color: #569cd6;
+}
+.hl-attr {
+  color: #9cdcfe;
+}
+.hl-value {
+  color: #ce9178;
 }
 
 /* Run + results */

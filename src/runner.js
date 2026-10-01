@@ -291,6 +291,9 @@ function sandboxBootstrap(configuration) {
       const event = action.name.startsWith("key")
         ? new NativeKeyboardEvent(action.name, {
             key: action.key || "",
+            // jQuery copies event.which straight from the native event.
+            keyCode: action.which || 0,
+            which: action.which || 0,
             bubbles: true,
             cancelable: true,
           })
